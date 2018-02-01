@@ -9,6 +9,9 @@
 using std::cout;
 using std::endl;
 
+using std::cout;
+using std::endl;
+
 namespace geometrycentral {
 
 // === Context
