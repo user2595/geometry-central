@@ -15,6 +15,9 @@ namespace surface {
 std::tuple<std::unique_ptr<HalfedgeMesh>, std::unique_ptr<VertexPositionGeometry>>
 loadMesh(std::string filename, bool verbose = false, std::string type = "");
 
+std::tuple<std::unique_ptr<HalfedgeMesh>, std::unique_ptr<VertexPositionGeometry>, CornerData<Vector2>>
+loadTexturedMesh(std::string filename, bool verbose = false, std::string type = "");
+
 // Load just the connectivity of a mesh from file.
 // Specify a type like "ply" or "obj", if no type is specified, attempts to infer from extension.
 std::unique_ptr<HalfedgeMesh> loadConnectivity(std::string filename, bool verbose = false, std::string type = "");

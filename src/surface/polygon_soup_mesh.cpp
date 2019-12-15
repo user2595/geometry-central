@@ -10,7 +10,9 @@ namespace geometrycentral {
 
 PolygonSoupMesh::PolygonSoupMesh() {}
 
-PolygonSoupMesh::PolygonSoupMesh(std::string meshFilename) { readMeshFromFile(meshFilename); }
+PolygonSoupMesh::PolygonSoupMesh(std::string meshFilename, bool loadTexture) {
+  readMeshFromFile(meshFilename, loadTexture);
+}
 
 PolygonSoupMesh::PolygonSoupMesh(const std::vector<std::vector<size_t>>& polygons_,
                                  const std::vector<Vector3>& vertexCoordinates_)
@@ -72,8 +74,8 @@ Index parseFaceIndex(const std::string& token) {
 }
 
 // Read a .obj file containing a polygon mesh
-void PolygonSoupMesh::readMeshFromFile(std::string filename) {
-  //std::cout << "Reading mesh from file: " << filename << std::endl;
+void PolygonSoupMesh::readMeshFromFile(std::string filename, bool loadTexture) {
+  // std::cout << "Reading mesh from file: " << filename << std::endl;
 
   polygons.clear();
   vertexCoordinates.clear();
@@ -84,6 +86,7 @@ void PolygonSoupMesh::readMeshFromFile(std::string filename) {
 
   // parse obj format
   std::string line;
+  std::vector<Vector2> textureCoordinateList;
   while (getline(in, line)) {
     std::stringstream ss(line);
     std::string token;
@@ -97,13 +100,19 @@ void PolygonSoupMesh::readMeshFromFile(std::string filename) {
       vertexCoordinates.push_back(Vector3{x, y, z});
 
     } else if (token == "vt") {
-      // Do nothing
+      if (loadTexture) {
+        double x, y;
+        ss >> x >> y;
+
+        textureCoordinateList.push_back(Vector2{x, y});
+      }
 
     } else if (token == "vn") {
       // Do nothing
 
     } else if (token == "f") {
       std::vector<size_t> face;
+      std::vector<Vector2> textureFace;
       while (ss >> token) {
         Index index = parseFaceIndex(token);
         if (index.position < 0) {
@@ -113,9 +122,11 @@ void PolygonSoupMesh::readMeshFromFile(std::string filename) {
         }
 
         face.push_back(index.position);
+        if (loadTexture) textureFace.push_back(textureCoordinateList[index.uv]);
       }
 
       polygons.push_back(face);
+      if (loadTexture) textureCoordinates.push_back(textureFace);
     }
   }
 }

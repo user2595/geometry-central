@@ -94,6 +94,28 @@ std::tuple<std::unique_ptr<HalfedgeMesh>, std::unique_ptr<VertexPositionGeometry
   stripUnusedVertices(soup.vertexCoordinates, soup.polygons);
   return makeHalfedgeAndGeometry(soup.polygons, soup.vertexCoordinates, verbose);
 }
+
+std::tuple<std::unique_ptr<HalfedgeMesh>, std::unique_ptr<VertexPositionGeometry>, CornerData<Vector2>>
+loadTexturedMesh_OBJ(std::string filename, bool verbose) {
+  PolygonSoupMesh soup(filename, true);
+  stripUnusedVertices(soup.vertexCoordinates, soup.polygons);
+
+  std::unique_ptr<HalfedgeMesh> mesh;
+  std::unique_ptr<VertexPositionGeometry> geo;
+  std::tie(mesh, geo) = makeHalfedgeAndGeometry(soup.polygons, soup.vertexCoordinates, verbose);
+  CornerData<Vector2> uv(*mesh);
+  size_t iF = 0;
+  for (Face f : mesh->faces()) {
+    size_t iC = 0;
+    for (Corner c : f.adjacentCorners()) {
+      uv[c] = soup.textureCoordinates[iF][iC];
+      iC++;
+    }
+    iF++;
+  }
+
+  return std::make_tuple(std::move(mesh), std::move(geo), uv);
+}
 } // namespace
 
 std::tuple<std::unique_ptr<HalfedgeMesh>, std::unique_ptr<VertexPositionGeometry>>
@@ -125,6 +147,44 @@ loadMesh(std::string filename, bool verbose, std::string type) {
     return loadMesh_OBJ(filename, verbose);
   } else if (type == "ply") {
     return loadMesh_PLY(filename, verbose);
+  } else {
+    if (typeGiven) {
+      throw std::runtime_error("Did not recognize mesh file type " + type);
+    } else {
+      throw std::runtime_error("Could not detect file type to load mesh from " + filename);
+    }
+  }
+}
+
+std::tuple<std::unique_ptr<HalfedgeMesh>, std::unique_ptr<VertexPositionGeometry>, CornerData<Vector2>>
+loadTexturedMesh(std::string filename, bool verbose, std::string type) {
+
+  // Check if file exists
+  std::ifstream testStream(filename);
+  if (!testStream) {
+    throw std::runtime_error("Could not load mesh; file does not exist: " + filename);
+  }
+  testStream.close();
+
+  // Attempt to detect filename
+  bool typeGiven = type != "";
+  std::string::size_type sepInd = filename.rfind('.');
+  if (!typeGiven) {
+    if (sepInd != std::string::npos) {
+      std::string extension;
+      extension = filename.substr(sepInd + 1);
+
+      // Convert to all lowercase
+      std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+      type = extension;
+    }
+  }
+
+
+  if (type == "obj") {
+    return loadTexturedMesh_OBJ(filename, verbose);
+  } else if (type == "ply") {
+    throw std::runtime_error("PLY textures not implemented yet");
   } else {
     if (typeGiven) {
       throw std::runtime_error("Did not recognize mesh file type " + type);

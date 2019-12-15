@@ -1,7 +1,7 @@
 #pragma once
 
-#include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/surface/halfedge_mesh.h"
+#include "geometrycentral/surface/vertex_position_geometry.h"
 
 #include <memory>
 #include <tuple>
