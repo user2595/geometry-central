@@ -150,6 +150,7 @@ bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geomet
 
   writeHeader(out, geometry);
   out << "# texture coordinates: NO" << endl;
+  out << "# normals: NO" << endl;
   cout << endl;
 
   writeVertices(out, geometry);
@@ -166,6 +167,7 @@ bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geomet
 
   writeHeader(out, geometry);
   out << "# texture coordinates: YES" << endl;
+  out << "# normals: NO" << endl;
   cout << endl;
 
   writeVertices(out, geometry);
@@ -173,6 +175,46 @@ bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geomet
 
   bool useTexCoords = true;
   writeFaces(out, geometry, useTexCoords);
+
+  return true;
+}
+
+bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector3>& normals) {
+  std::ofstream out;
+  if (!openStream(out, filename)) return false;
+
+  writeHeader(out, geometry);
+  out << "# texture coordinates: NO" << endl;
+  out << "# normals: YES" << endl;
+  cout << endl;
+
+  writeVertices(out, geometry);
+  writeNormals(out, geometry, normals);
+
+  bool useTexCoords = false;
+  bool useNormals = true;
+  writeFaces(out, geometry, useTexCoords, useNormals);
+
+  return true;
+}
+
+bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector2>& texcoords,
+                         CornerData<Vector3>& normals) {
+  std::ofstream out;
+  if (!openStream(out, filename)) return false;
+
+  writeHeader(out, geometry);
+  out << "# texture coordinates: YES" << endl;
+  out << "# normals: YES" << endl;
+  cout << endl;
+
+  writeVertices(out, geometry);
+  writeTexCoords(out, geometry, texcoords);
+  writeNormals(out, geometry, normals);
+
+  bool useTexCoords = true;
+  bool useNormals = true;
+  writeFaces(out, geometry, useTexCoords, useNormals);
 
   return true;
 }
