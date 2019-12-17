@@ -257,13 +257,13 @@ std::unique_ptr<HalfedgeMesh> loadConnectivity(std::string filename, bool verbos
 
 // ======= Output =======
 
-/*
-bool WavefrontOBJ::write(std::string filename, GeometryEuclidean>& geometry) {
+bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry) {
   std::ofstream out;
   if (!openStream(out, filename)) return false;
 
   writeHeader(out, geometry);
   out << "# texture coordinates: NO" << endl;
+  out << "# normals: NO" << endl;
   cout << endl;
 
   writeVertices(out, geometry);
@@ -274,12 +274,13 @@ bool WavefrontOBJ::write(std::string filename, GeometryEuclidean>& geometry) {
   return true;
 }
 
-bool WavefrontOBJ::write(std::string filename, Geometry<Euclidean>& geometry, CornerData<Vector2>& texcoords) {
+bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector2>& texcoords) {
   std::ofstream out;
   if (!openStream(out, filename)) return false;
 
   writeHeader(out, geometry);
   out << "# texture coordinates: YES" << endl;
+  out << "# normals: NO" << endl;
   cout << endl;
 
   writeVertices(out, geometry);
@@ -287,6 +288,46 @@ bool WavefrontOBJ::write(std::string filename, Geometry<Euclidean>& geometry, Co
 
   bool useTexCoords = true;
   writeFaces(out, geometry, useTexCoords);
+
+  return true;
+}
+
+bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector3>& normals) {
+  std::ofstream out;
+  if (!openStream(out, filename)) return false;
+
+  writeHeader(out, geometry);
+  out << "# texture coordinates: NO" << endl;
+  out << "# normals: YES" << endl;
+  cout << endl;
+
+  writeVertices(out, geometry);
+  writeNormals(out, geometry, normals);
+
+  bool useTexCoords = false;
+  bool useNormals = true;
+  writeFaces(out, geometry, useTexCoords, useNormals);
+
+  return true;
+}
+
+bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector2>& texcoords,
+                         CornerData<Vector3>& normals) {
+  std::ofstream out;
+  if (!openStream(out, filename)) return false;
+
+  writeHeader(out, geometry);
+  out << "# texture coordinates: YES" << endl;
+  out << "# normals: YES" << endl;
+  cout << endl;
+
+  writeVertices(out, geometry);
+  writeTexCoords(out, geometry, texcoords);
+  writeNormals(out, geometry, normals);
+
+  bool useTexCoords = true;
+  bool useNormals = true;
+  writeFaces(out, geometry, useTexCoords, useNormals);
 
   return true;
 }
@@ -306,23 +347,26 @@ bool WavefrontOBJ::openStream(std::ofstream& out, std::string filename) {
   return true;
 }
 
-void WavefrontOBJ::writeHeader(std::ofstream& out, Geometry<Euclidean>& geometry) {
+void WavefrontOBJ::writeHeader(std::ofstream& out, EmbeddedGeometryInterface& geometry) {
   out << "# Mesh exported from GeometryCentral" << endl;
   out << "#  vertices: " << geometry.mesh.nVertices() << endl;
   out << "#     edges: " << geometry.mesh.nEdges() << endl;
   out << "#     faces: " << geometry.mesh.nFaces() << endl;
 }
 
-void WavefrontOBJ::writeVertices(std::ofstream& out, Geometry<Euclidean>& geometry) {
+void WavefrontOBJ::writeVertices(std::ofstream& out, EmbeddedGeometryInterface& geometry) {
   HalfedgeMesh& mesh(geometry.mesh);
+  geometry.requireVertexPositions();
+  VertexData<Vector3> pos = geometry.vertexPositions;
 
   for (Vertex v : mesh.vertices()) {
-    Vector3 p = geometry.position(v);
+    Vector3 p = pos[v];
     out << "v " << p.x << " " << p.y << " " << p.z << endl;
   }
 }
 
-void WavefrontOBJ::writeTexCoords(std::ofstream& out, Geometry<Euclidean>& geometry, CornerData<Vector2>& texcoords) {
+void WavefrontOBJ::writeTexCoords(std::ofstream& out, EmbeddedGeometryInterface& geometry,
+                                  CornerData<Vector2>& texcoords) {
   HalfedgeMesh& mesh(geometry.mesh);
 
   for (Corner c : mesh.corners()) {
@@ -331,34 +375,37 @@ void WavefrontOBJ::writeTexCoords(std::ofstream& out, Geometry<Euclidean>& geome
   }
 }
 
-void WavefrontOBJ::writeFaces(std::ofstream& out, Geometry<Euclidean>& geometry, bool useTexCoords) {
+void WavefrontOBJ::writeNormals(std::ofstream& out, EmbeddedGeometryInterface& geometry, CornerData<Vector3>& normals) {
+  HalfedgeMesh& mesh(geometry.mesh);
+
+  for (Corner c : mesh.corners()) {
+    Vector3 n = normals[c];
+    out << "vn " << n.x << " " << n.y << " " << n.z << endl;
+  }
+}
+
+void WavefrontOBJ::writeFaces(std::ofstream& out, EmbeddedGeometryInterface& geometry, bool useTexCoords,
+                              bool useNormalCoords) {
   HalfedgeMesh& mesh(geometry.mesh);
 
   // Get vertex indices
   VertexData<size_t> indices = mesh.getVertexIndices();
+  CornerData<size_t> cIndices = mesh.getCornerIndices();
 
-  if (useTexCoords) {
-    // Get corner indices
-    CornerData<size_t> cIndices = mesh.getCornerIndices();
+  auto indexFn = [&](Corner c) {
+    std::string texCoordString = (useTexCoords) ? std::to_string(cIndices[c] + 1) : "";
+    std::string normalCoordString = (useNormalCoords) ? std::to_string(cIndices[c] + 1) : "";
+    return " " + std::to_string(indices[c.vertex()] + 1) + "/" + texCoordString + "/" + normalCoordString;
+  };
 
-    for (Face f : mesh.faces()) {
-      out << "f";
-      for (Corner c : f.adjacentCorners()) {
-        out << " " << indices[c.vertex()] + 1 << "/" << cIndices[c] + 1; // OBJ uses 1-based indexing
-      }
-      out << endl;
+  for (Face f : mesh.faces()) {
+    out << "f";
+    for (Corner c : f.adjacentCorners()) {
+      out << indexFn(c);
     }
-  } else {
-    for (Face f : mesh.faces()) {
-      out << "f";
-      for (Halfedge h : f.adjacentHalfedges()) {
-        out << " " << indices[h.vertex()] + 1; // OBJ uses 1-based indexing
-      }
-      out << endl;
-    }
+    out << endl;
   }
 }
-*/
 
 std::array<std::pair<std::vector<size_t>, size_t>, 5> polyscopePermutations(HalfedgeMesh& mesh) {
   std::array<std::pair<std::vector<size_t>, size_t>, 5> result;
