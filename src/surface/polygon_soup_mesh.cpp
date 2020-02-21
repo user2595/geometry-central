@@ -144,8 +144,8 @@ void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
   std::vector<Vector2> textureCoordinateList;
 
   getline(in, line);
-  if (line.rfing("solid", 0) != 0) {
-    throw std::runtime_error("STL parser for binary files not implemented yet")
+  if (line.rfind("solid", 0) != 0) {
+    throw std::runtime_error("STL parser for binary files not implemented yet");
   }
 
   // TODO: read stl file name
@@ -162,13 +162,6 @@ void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
 
       vertexCoordinates.push_back(Vector3{x, y, z});
 
-    } else if (token == "vt") {
-      if (loadTexture) {
-        double x, y;
-        ss >> x >> y;
-
-        textureCoordinateList.push_back(Vector2{x, y});
-      }
 
     } else if (token == "vn") {
       // Do nothing
