@@ -18,8 +18,9 @@ namespace surface {
 
 // ======= Input =======
 
-// strip unused vertices from face-vertex lists
-void stripUnusedVertices(std::vector<Vector3>& positions, std::vector<std::vector<size_t>>& faceIndices) {
+// strip unused vertices from face-vertex lists. Returns the mapping from old vertices to new vertices
+std::vector<size_t> stripUnusedVertices(std::vector<Vector3>& positions,
+                                        std::vector<std::vector<size_t>>& faceIndices) {
 
   size_t nVert = positions.size();
 
@@ -39,9 +40,14 @@ void stripUnusedVertices(std::vector<Vector3>& positions, std::vector<std::vecto
     }
   }
 
+  // TODO: this is probably useless work most of the time
   // Early exit if dense
   if (nUsedVerts == nVert) {
-    return;
+    std::vector<size_t> identity(nVert);
+    for (size_t i = 0; i < nVert; ++i) {
+      identity.push_back(nVert);
+    }
+    return identity;
   }
 
   // Else: strip unused vertices and re-index faces
@@ -60,6 +66,8 @@ void stripUnusedVertices(std::vector<Vector3>& positions, std::vector<std::vecto
       i = oldToNewVertexInd[i];
     }
   }
+
+  return oldToNewVertexInd;
 }
 
 
