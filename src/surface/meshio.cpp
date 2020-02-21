@@ -26,6 +26,8 @@ void processLoadedMesh(SimplePolygonMesh& mesh, std::string type) {
   if (type == "stl") {
     mesh.mergeIdenticalVertices();
   }
+
+  return oldToNewVertexInd;
 }
 
 
