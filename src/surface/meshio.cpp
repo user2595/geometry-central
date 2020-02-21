@@ -124,6 +124,7 @@ loadTexturedMesh_OBJ(std::string filename, bool verbose) {
 
   return std::make_tuple(std::move(mesh), std::move(geo), uv);
 }
+
 } // namespace
 
 std::tuple<std::unique_ptr<HalfedgeMesh>, std::unique_ptr<VertexPositionGeometry>>

@@ -68,14 +68,13 @@ PositiveDefiniteSolver<T>::PositiveDefiniteSolver(SparseMatrix<T>& mat)
   internals->factorization = cholmod_l_analyze(internals->cMat, internals->context);
   bool success = (bool)cholmod_l_factorize(internals->cMat, internals->factorization, internals->context);
 
-  if(!success) {
+  if (!success) {
     throw std::runtime_error("failure in cholmod_l_factorize");
   }
-  if(internals->context.context.status == CHOLMOD_NOT_POSDEF) {
+  if (internals->context.context.status == CHOLMOD_NOT_POSDEF) {
     throw std::runtime_error("matrix is not positive definite");
   }
 
-  
 
   // Eigen version
 #else

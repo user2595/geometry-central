@@ -131,6 +131,67 @@ void PolygonSoupMesh::readMeshFromFile(std::string filename, bool loadTexture) {
   }
 }
 
+void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
+  polygons.clear();
+  vertexCoordinates.clear();
+
+  // Open the file
+  std::ifstream in(filename);
+  if (!in) throw std::invalid_argument("Could not open mesh file " + filename);
+
+  // parse stl format
+  std::string line;
+  std::vector<Vector2> textureCoordinateList;
+
+  getline(in, line);
+  if (line.rfing("solid", 0) != 0) {
+    throw std::runtime_error("STL parser for binary files not implemented yet")
+  }
+
+  // TODO: read stl file name
+
+  while (getline(in, line)) {
+    std::stringstream ss(line);
+    std::string token;
+
+    ss >> token;
+
+    if (token == "v") {
+      double x, y, z;
+      ss >> x >> y >> z;
+
+      vertexCoordinates.push_back(Vector3{x, y, z});
+
+    } else if (token == "vt") {
+      if (loadTexture) {
+        double x, y;
+        ss >> x >> y;
+
+        textureCoordinateList.push_back(Vector2{x, y});
+      }
+
+    } else if (token == "vn") {
+      // Do nothing
+
+    } else if (token == "f") {
+      std::vector<size_t> face;
+      std::vector<Vector2> textureFace;
+      while (ss >> token) {
+        Index index = parseFaceIndex(token);
+        if (index.position < 0) {
+          getline(in, line);
+          size_t i = line.find_first_not_of("\t\n\v\f\r ");
+          index = parseFaceIndex(line.substr(i));
+        }
+
+        face.push_back(index.position);
+      }
+
+      polygons.push_back(face);
+    }
+  }
+}
+
 void PolygonSoupMesh::triangulate() {
   std::vector<std::vector<size_t>> newPolygons;
 
