@@ -114,7 +114,13 @@ std::tuple<std::unique_ptr<HalfedgeMesh>, std::unique_ptr<VertexPositionGeometry
   duration = (std::clock() - start) / (double)CLOCKS_PER_SEC;
   cout << "Deduping took " << duration << "s" << endl << endl;
   stripUnusedVertices(soup.vertexCoordinates, soup.polygons);
-  return makeHalfedgeAndGeometry(soup.polygons, soup.vertexCoordinates, verbose);
+  std::unique_ptr<HalfedgeMesh> mesh;
+  std::unique_ptr<VertexPositionGeometry> geo;
+  start = std::clock();
+  std::tie(mesh, geo) = makeHalfedgeAndGeometry(soup.polygons, soup.vertexCoordinates, verbose);
+  duration = (std::clock() - start) / (double)CLOCKS_PER_SEC;
+  cout << "Mesh construction took " << duration << "s" << endl << endl;
+  return std::make_tuple(std::move(mesh), std::move(geo));
 }
 
 std::tuple<std::unique_ptr<HalfedgeMesh>, std::unique_ptr<VertexPositionGeometry>, CornerData<Vector2>>

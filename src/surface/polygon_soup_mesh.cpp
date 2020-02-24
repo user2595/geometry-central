@@ -237,17 +237,11 @@ void PolygonSoupMesh::readMeshFromAsciiStlFile(std::ifstream& in) {
 }
 
 void PolygonSoupMesh::readMeshFromBinaryStlFile(std::ifstream in) {
-  auto parseFloat = [](std::ifstream& in) {
-    char buffer[sizeof(float)];
-    in.read(buffer, sizeof(float));
-    float* floatPointer = (float*)buffer;
-    return *floatPointer;
-  };
   auto parseVector3 = [&](std::ifstream& in) {
-    double vX = parseFloat(in);
-    double vY = parseFloat(in);
-    double vZ = parseFloat(in);
-    return Vector3{vX, vY, vZ};
+    char buffer[3 * sizeof(float)];
+    in.read(buffer, 3 * sizeof(float));
+    float* fVec = (float*)buffer;
+    return Vector3{fVec[0], fVec[1], fVec[2]};
   };
 
   char header[80];
@@ -341,8 +335,7 @@ void PolygonSoupMesh::mergeByDistance(double tol) {
     std::cout << std::endl;
   } else {
 
-    // TODO: make this not take n^2 time
-    // Smarter spatial data structure?
+    // TODO: Smarter spatial data structure?
 
     double minX = rawVertexPositions[0].x;
     double maxX = rawVertexPositions[0].x;
@@ -370,6 +363,16 @@ void PolygonSoupMesh::mergeByDistance(double tol) {
       vertexBuckets.push_back(std::vector<size_t>());
       vertexBuckets[iB].reserve(((double)nV) / ((double)nBuckets));
     }
+
+    auto onBoundary = [&](Vector3 pos, int& xBoundary, int& yBoundary, int& zBoundary) {
+      double xIndex = fmod((pos.x - minX) / (maxX - minX) * gridSize * 0.99, 1);
+      double yIndex = fmod((pos.y - minY) / (maxY - minY) * gridSize * 0.99, 1);
+      double zIndex = fmod((pos.z - minZ) / (maxZ - minZ) * gridSize * 0.99, 1);
+
+      xBoundary = (xIndex < tol) ? -1 : (xIndex >= 1 - tol) ? 1 : 0;
+      yBoundary = (yIndex < tol) ? -1 : (yIndex >= 1 - tol) ? 1 : 0;
+      zBoundary = (zIndex < tol) ? -1 : (zIndex >= 1 - tol) ? 1 : 0;
+    };
 
     auto getBucketCoords = [&](Vector3 pos) {
       // Multiply by 0.99 so that the answer is strictly less than gridSize
@@ -404,16 +407,23 @@ void PolygonSoupMesh::mergeByDistance(double tol) {
 
         // Check neighboring buckets for nearby vertices
         std::array<int, 3> bucketCoords = getBucketCoords(pos);
-        for (int dx = -1; dx <= 1; ++dx) {
-          for (int dy = -1; dy <= 1; ++dy) {
-            for (int dz = -1; dz <= 1; ++dz) {
+        int xBoundary, yBoundary, zBoundary;
+        onBoundary(pos, xBoundary, yBoundary, zBoundary);
+        std::set<int> dxSet{0, xBoundary};
+        std::set<int> dySet{0, yBoundary};
+        std::set<int> dzSet{0, zBoundary};
+
+
+        for (int dx : dxSet) {
+          for (int dy : dxSet) {
+            for (int dz : dxSet) {
               std::array<int, 3> neighborBucketCoords = bucketCoords;
               neighborBucketCoords[0] += dx;
               neighborBucketCoords[1] += dy;
               neighborBucketCoords[2] += dz;
-              if (neighborBucketCoords[0] >= 0 && neighborBucketCoords[0] < gridSize && neighborBucketCoords[1] >= 0 &&
-                  neighborBucketCoords[1] < gridSize && neighborBucketCoords[2] >= 0 &&
-                  neighborBucketCoords[2] < gridSize) {
+              if (neighborBucketCoords[0] >= 0 && neighborBucketCoords[0] < (int)gridSize &&
+                  neighborBucketCoords[1] >= 0 && neighborBucketCoords[1] < (int)gridSize &&
+                  neighborBucketCoords[2] >= 0 && neighborBucketCoords[2] < (int)gridSize) {
 
                 for (size_t iW : vertexBuckets[getBucketIndex(neighborBucketCoords)]) {
                   Vector3 posW = rawVertexPositions[iW];
@@ -429,30 +439,22 @@ void PolygonSoupMesh::mergeByDistance(double tol) {
         }
       }
 
-      if (iV % (size_t)1e3 == 0) {
+      if (iV % (size_t)1e5 == 0) {
         std::cout << "\r" << iV << " / " << nV << " " << ((double)iV) / ((double)nV) * 100.0 << "%\t\t" << std::flush;
       }
     }
     delete[] visited;
   }
+  std::cout << std::endl;
 
 
   // Update face indices
   for (std::vector<size_t>& face : polygons) {
-    for (size_t iFV = 0; iFV < face.size(); ++iFV) {
-      face[iFV] = compressVertex[face[iFV]];
+    for (size_t& iV : face) {
+      iV = compressVertex[iV];
     }
   }
 }
-
-
-//   // Update face indices
-//   for (std::vector<size_t>& face : polygons) {
-//     for (size_t& iV : face) {
-//       iV = compressVertex[iV];
-//     }
-//   }
-// }
 
 void PolygonSoupMesh::triangulate() {
   std::vector<std::vector<size_t>> newPolygons;
