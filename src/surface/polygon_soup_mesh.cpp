@@ -302,40 +302,157 @@ void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
 }
 
 void PolygonSoupMesh::mergeByDistance(double tol) {
+
+  size_t nV = vertexCoordinates.size();
+
   std::vector<Vector3> rawVertexPositions = std::move(vertexCoordinates);
   vertexCoordinates.clear();
 
   // dedupe vertices so that we can build a mesh later if we want to
   std::vector<size_t> compressVertex;
-  compressVertex.reserve(rawVertexPositions.size());
+  compressVertex.resize(rawVertexPositions.size());
 
-  // TODO: make this not take n^2 time
-  for (size_t iV = 0; iV < rawVertexPositions.size(); ++iV) {
-    Vector3 pos = rawVertexPositions[iV];
+  if (nV < 1e6) {
+    std::vector<char> visited;
+    visited.reserve(nV);
+    for (size_t iV = 0; iV < nV; ++iV) visited[iV] = false;
 
-    // Find the first vertex at the same position as iV.
-    // We're guaranteed to find something since eventually iW = iV
-    for (size_t iW = 0; iW <= iV; ++iW) {
-      Vector3 posW = rawVertexPositions[iW];
-      if ((pos - posW).norm() < tol) {
-        if (iV == iW) {
-          vertexCoordinates.push_back(pos);
-          compressVertex[iV] = vertexCoordinates.size() - 1;
-        } else {
-          compressVertex[iV] = compressVertex[iW];
+    for (size_t iV = 0; iV < rawVertexPositions.size(); ++iV) {
+      if (visited[iV]) {
+        continue;
+      } else {
+        Vector3 pos = rawVertexPositions[iV];
+        vertexCoordinates.push_back(pos);
+        compressVertex[iV] = vertexCoordinates.size() - 1;
+
+        // Mark all future vertices at this position as visited
+        for (size_t iW = iV + 1; iW < nV; ++iW) {
+          Vector3 posW = rawVertexPositions[iW];
+          if ((pos - posW).norm() < tol) {
+            compressVertex[iW] = compressVertex[iV];
+            visited[iW] = true;
+          }
         }
-        break;
+      }
+      if (iV % (size_t)1e2 == 0) {
+        std::cout << "\r" << iV << " / " << nV << " " << ((double)iV) / ((double)nV) * 100.0 << "%\t\t" << std::flush;
       }
     }
+    std::cout << std::endl;
+  } else {
+
+    // TODO: make this not take n^2 time
+    // Smarter spatial data structure?
+
+    double minX = rawVertexPositions[0].x;
+    double maxX = rawVertexPositions[0].x;
+    double minY = rawVertexPositions[0].y;
+    double maxY = rawVertexPositions[0].y;
+    double minZ = rawVertexPositions[0].z;
+    double maxZ = rawVertexPositions[0].z;
+
+    bool* visited = new bool[nV];
+    for (size_t iV = 0; iV < nV; ++iV) {
+      visited[iV] = false;
+      minX = fmin(minX, rawVertexPositions[iV].x);
+      minY = fmin(minY, rawVertexPositions[iV].y);
+      minZ = fmin(minZ, rawVertexPositions[iV].z);
+      maxX = fmax(maxX, rawVertexPositions[iV].x);
+      maxY = fmax(maxY, rawVertexPositions[iV].y);
+      maxZ = fmax(maxZ, rawVertexPositions[iV].z);
+    }
+
+    size_t gridSize = std::cbrt((double)nV) / 8;
+    size_t nBuckets = gridSize * gridSize * gridSize;
+    std::vector<std::vector<size_t>> vertexBuckets;
+    vertexBuckets.reserve(nBuckets);
+    for (size_t iB = 0; iB < nBuckets; ++iB) {
+      vertexBuckets.push_back(std::vector<size_t>());
+      vertexBuckets[iB].reserve(((double)nV) / ((double)nBuckets));
+    }
+
+    auto getBucketCoords = [&](Vector3 pos) {
+      // Multiply by 0.99 so that the answer is strictly less than gridSize
+      int xIndex = (int)((pos.x - minX) / (maxX - minX) * gridSize * 0.99);
+      int yIndex = (int)((pos.y - minY) / (maxY - minY) * gridSize * 0.99);
+      int zIndex = (int)((pos.z - minZ) / (maxZ - minZ) * gridSize * 0.99);
+      return std::array<int, 3>{xIndex, yIndex, zIndex};
+    };
+
+    auto getBucketIndex = [&](std::array<int, 3> bucketCoords) {
+      return bucketCoords[0] + gridSize * bucketCoords[1] + gridSize * gridSize * bucketCoords[2];
+    };
+
+    for (size_t iV = 0; iV < nV; ++iV) {
+      Vector3 pos = rawVertexPositions[iV];
+      size_t vBucketIndex = getBucketIndex(getBucketCoords(pos));
+
+      if (vBucketIndex >= nBuckets) {
+        std::cerr << "Error: bucket index " << vBucketIndex << " bigger than maximum " << nBuckets << std::endl;
+        exit(1);
+      }
+      vertexBuckets[vBucketIndex].push_back(iV);
+    }
+
+    for (size_t iV = 0; iV < nV; ++iV) {
+      if (visited[iV]) {
+        continue;
+      } else {
+        Vector3 pos = rawVertexPositions[iV];
+        vertexCoordinates.push_back(pos);
+        compressVertex[iV] = vertexCoordinates.size() - 1;
+
+        // Check neighboring buckets for nearby vertices
+        std::array<int, 3> bucketCoords = getBucketCoords(pos);
+        for (int dx = -1; dx <= 1; ++dx) {
+          for (int dy = -1; dy <= 1; ++dy) {
+            for (int dz = -1; dz <= 1; ++dz) {
+              std::array<int, 3> neighborBucketCoords = bucketCoords;
+              neighborBucketCoords[0] += dx;
+              neighborBucketCoords[1] += dy;
+              neighborBucketCoords[2] += dz;
+              if (neighborBucketCoords[0] >= 0 && neighborBucketCoords[0] < gridSize && neighborBucketCoords[1] >= 0 &&
+                  neighborBucketCoords[1] < gridSize && neighborBucketCoords[2] >= 0 &&
+                  neighborBucketCoords[2] < gridSize) {
+
+                for (size_t iW : vertexBuckets[getBucketIndex(neighborBucketCoords)]) {
+                  Vector3 posW = rawVertexPositions[iW];
+                  if ((pos - posW).norm() < tol) {
+
+                    compressVertex[iW] = compressVertex[iV];
+                    visited[iW] = true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (iV % (size_t)1e3 == 0) {
+        std::cout << "\r" << iV << " / " << nV << " " << ((double)iV) / ((double)nV) * 100.0 << "%\t\t" << std::flush;
+      }
+    }
+    delete[] visited;
   }
+
 
   // Update face indices
   for (std::vector<size_t>& face : polygons) {
-    for (size_t& iV : face) {
-      iV = compressVertex[iV];
+    for (size_t iFV = 0; iFV < face.size(); ++iFV) {
+      face[iFV] = compressVertex[face[iFV]];
     }
   }
 }
+
+
+//   // Update face indices
+//   for (std::vector<size_t>& face : polygons) {
+//     for (size_t& iV : face) {
+//       iV = compressVertex[iV];
+//     }
+//   }
+// }
 
 void PolygonSoupMesh::triangulate() {
   std::vector<std::vector<size_t>> newPolygons;
