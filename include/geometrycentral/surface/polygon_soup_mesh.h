@@ -16,6 +16,7 @@ class PolygonSoupMesh {
 public:
   PolygonSoupMesh();
   PolygonSoupMesh(std::string meshFilename, bool loadTexture = false);
+  PolygonSoupMesh(std::string meshFilename, std::string type);
   PolygonSoupMesh(const std::vector<std::vector<size_t>>& polygons_, const std::vector<Vector3>& vertexCoordinates_);
 
   // Mutate this mesh and by naively triangulating polygons
@@ -26,6 +27,8 @@ public:
   std::vector<Vector3> vertexCoordinates;
 
   std::vector<std::vector<Vector2>> textureCoordinates;
+
+  void mergeByDistance(double tol);
 
 private:
   void readMeshFromFile(std::string filename, bool loadTexture = false);

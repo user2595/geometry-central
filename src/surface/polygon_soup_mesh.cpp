@@ -14,6 +14,36 @@ PolygonSoupMesh::PolygonSoupMesh(std::string meshFilename, bool loadTexture) {
   readMeshFromFile(meshFilename, loadTexture);
 }
 
+PolygonSoupMesh::PolygonSoupMesh(std::string meshFilename, std::string type) {
+
+  // Attempt to detect filename
+  bool typeGiven = type != "";
+  std::string::size_type sepInd = meshFilename.rfind('.');
+  if (!typeGiven) {
+    if (sepInd != std::string::npos) {
+      std::string extension;
+      extension = meshFilename.substr(sepInd + 1);
+
+      // Convert to all lowercase
+      std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+      type = extension;
+    }
+  }
+
+  if (type == "obj") {
+    readMeshFromFile(meshFilename, false);
+  } else if (type == "stl") {
+    readMeshFromStlFile(meshFilename);
+  } else {
+    if (typeGiven) {
+      throw std::runtime_error("Did not recognize mesh file type " + type);
+    } else {
+      throw std::runtime_error("Could not detect file type to load mesh from " + meshFilename + ". (Found type " +
+                               type + ", but cannot load this)");
+    }
+  }
+}
+
 PolygonSoupMesh::PolygonSoupMesh(const std::vector<std::vector<size_t>>& polygons_,
                                  const std::vector<Vector3>& vertexCoordinates_)
     : polygons(polygons_), vertexCoordinates(vertexCoordinates_) {}
@@ -131,6 +161,7 @@ void PolygonSoupMesh::readMeshFromFile(std::string filename, bool loadTexture) {
   }
 }
 
+// STL files are just a triangle soup, so we need a tolerance to decide when to merge vertices together
 void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
   polygons.clear();
   vertexCoordinates.clear();
@@ -147,40 +178,89 @@ void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
   if (line.rfind("solid", 0) != 0) {
     throw std::runtime_error("STL parser for binary files not implemented yet");
   }
-
   // TODO: read stl file name
+  size_t lineNum = 1;
 
+  auto assertEq = [&](std::string expected, std::string found) {
+    if (found != expected) {
+      std::cerr << "Error on line " << lineNum << ". Expected \"" << expected << "\" but found \"" << found << "\""
+                << std::endl;
+      std::cerr << "Full line: \"" << line << "\"" << std::endl;
+      exit(1);
+    }
+  };
+
+  // Parse STL file
   while (getline(in, line)) {
+    lineNum++;
+
     std::stringstream ss(line);
     std::string token;
 
     ss >> token;
+    assertEq("facet", token);
 
-    if (token == "v") {
-      double x, y, z;
-      ss >> x >> y >> z;
+    ss >> token;
+    assertEq("normal", token);
 
-      vertexCoordinates.push_back(Vector3{x, y, z});
+    // TODO: store this normal?
+    // TODO: orient face according to normal
+    double nX, nY, nZ;
+    ss >> nX, nY, nZ;
+    Vector3 normal{nX, nY, nZ};
 
+    getline(in, line);
+    lineNum++;
 
-    } else if (token == "vn") {
-      // Do nothing
+    assertEq("outer loop", line);
+    std::vector<size_t> face;
+    do {
+      getline(in, line);
+      lineNum++;
+      ss >> token;
+      assertEq("vertex", token);
 
-    } else if (token == "f") {
-      std::vector<size_t> face;
-      std::vector<Vector2> textureFace;
-      while (ss >> token) {
-        Index index = parseFaceIndex(token);
-        if (index.position < 0) {
-          getline(in, line);
-          size_t i = line.find_first_not_of("\t\n\v\f\r ");
-          index = parseFaceIndex(line.substr(i));
+      double vX, vY, vZ;
+      ss >> vX, vY, vZ;
+      vertexCoordinates.push_back(Vector3{vX, vY, vZ});
+      face.push_back(vertexCoordinates.size());
+    } while (line != "endloop");
+    polygons.push_back(face);
+  }
+}
+
+void PolygonSoupMesh::mergeByDistance(double tol) {
+  std::vector<Vector3> rawVertexPositions = std::move(vertexCoordinates);
+  vertexCoordinates.clear();
+
+  // dedupe vertices so that we can build a mesh later if we want to
+  std::vector<size_t> compressVertex;
+  compressVertex.reserve(rawVertexPositions.size());
+
+  // TODO: make this not take n^2 time
+  for (size_t iV = 0; iV < rawVertexPositions.size(); ++iV) {
+    Vector3 pos = rawVertexPositions[iV];
+
+    // Find the first vertex at the same position as iV.
+    // We're guaranteed to find something since eventually iW = iV
+    for (size_t iW = 0; iW <= iV; ++iW) {
+      Vector3 posW = rawVertexPositions[iW];
+      if ((pos - posW).norm() < tol) {
+        if (iV == iW) {
+          vertexCoordinates.push_back(pos);
+          compressVertex[iV] = vertexCoordinates.size();
+        } else {
+          compressVertex[iV] = compressVertex[iW];
         }
-
-        face.push_back(index.position);
+        break;
       }
+    }
+  }
 
-      polygons.push_back(face);
+  // Update face indices
+  for (std::vector<size_t>& face : polygons) {
+    for (size_t& iV : face) {
+      iV = compressVertex[iV];
     }
   }
 }
