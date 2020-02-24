@@ -14,6 +14,7 @@ PolygonSoupMesh::PolygonSoupMesh(std::string meshFilename, bool loadTexture) {
   readMeshFromFile(meshFilename, loadTexture);
 }
 
+// TODO, char* can get cast to bool, so using bool and string as optional arguments leads to horrible bugs
 PolygonSoupMesh::PolygonSoupMesh(std::string meshFilename, std::string type) {
 
   // Attempt to detect filename
@@ -161,7 +162,6 @@ void PolygonSoupMesh::readMeshFromFile(std::string filename, bool loadTexture) {
   }
 }
 
-// STL files are just a triangle soup, so we need a tolerance to decide when to merge vertices together
 void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
   polygons.clear();
   vertexCoordinates.clear();
@@ -172,7 +172,7 @@ void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
 
   // parse stl format
   std::string line;
-  std::vector<Vector2> textureCoordinateList;
+  std::stringstream ss;
 
   getline(in, line);
   if (line.rfind("solid", 0) != 0) {
@@ -190,14 +190,24 @@ void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
     }
   };
 
-  // Parse STL file
-  while (getline(in, line)) {
+  auto nextLine = [&]() {
+    if (!getline(in, line)) {
+      return false;
+    }
+    ss = std::stringstream(line);
     lineNum++;
+    return true;
+  };
 
-    std::stringstream ss(line);
+  // Parse STL file
+  while (nextLine()) {
+
     std::string token;
 
     ss >> token;
+    if (token == "endsolid") {
+      break;
+    }
     assertEq("facet", token);
 
     ss >> token;
@@ -205,26 +215,30 @@ void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
 
     // TODO: store this normal?
     // TODO: orient face according to normal
-    double nX, nY, nZ;
-    ss >> nX, nY, nZ;
+    double nX = 0, nY = 0, nZ = 0;
+    ss >> nX >> nY >> nZ;
     Vector3 normal{nX, nY, nZ};
 
-    getline(in, line);
-    lineNum++;
+    nextLine();
 
     assertEq("outer loop", line);
     std::vector<size_t> face;
-    do {
-      getline(in, line);
-      lineNum++;
+
+    while (nextLine() && line != "endloop") {
       ss >> token;
       assertEq("vertex", token);
 
-      double vX, vY, vZ;
-      ss >> vX, vY, vZ;
+      double vX = 0, vY = 0, vZ = 0;
+      ss >> vX >> vY >> vZ;
       vertexCoordinates.push_back(Vector3{vX, vY, vZ});
-      face.push_back(vertexCoordinates.size());
-    } while (line != "endloop");
+
+      face.push_back(vertexCoordinates.size() - 1);
+    }
+
+    nextLine();
+
+    assertEq("endfacet", line);
+
     polygons.push_back(face);
   }
 }
@@ -248,7 +262,7 @@ void PolygonSoupMesh::mergeByDistance(double tol) {
       if ((pos - posW).norm() < tol) {
         if (iV == iW) {
           vertexCoordinates.push_back(pos);
-          compressVertex[iV] = vertexCoordinates.size();
+          compressVertex[iV] = vertexCoordinates.size() - 1;
         } else {
           compressVertex[iV] = compressVertex[iW];
         }

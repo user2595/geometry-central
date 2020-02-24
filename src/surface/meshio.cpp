@@ -98,7 +98,15 @@ std::tuple<std::unique_ptr<HalfedgeMesh>, std::unique_ptr<VertexPositionGeometry
 
 std::tuple<std::unique_ptr<HalfedgeMesh>, std::unique_ptr<VertexPositionGeometry>> loadMesh_OBJ(std::string filename,
                                                                                                 bool verbose) {
-  PolygonSoupMesh soup(filename);
+  PolygonSoupMesh soup(filename, "obj");
+  stripUnusedVertices(soup.vertexCoordinates, soup.polygons);
+  return makeHalfedgeAndGeometry(soup.polygons, soup.vertexCoordinates, verbose);
+}
+
+std::tuple<std::unique_ptr<HalfedgeMesh>, std::unique_ptr<VertexPositionGeometry>> loadMesh_STL(std::string filename,
+                                                                                                bool verbose) {
+  PolygonSoupMesh soup(filename, std::string("stl"));
+  soup.mergeByDistance(1e-8);
   stripUnusedVertices(soup.vertexCoordinates, soup.polygons);
   return makeHalfedgeAndGeometry(soup.polygons, soup.vertexCoordinates, verbose);
 }
@@ -156,6 +164,8 @@ loadMesh(std::string filename, bool verbose, std::string type) {
     return loadMesh_OBJ(filename, verbose);
   } else if (type == "ply") {
     return loadMesh_PLY(filename, verbose);
+  } else if (type == "stl") {
+    return loadMesh_STL(filename, verbose);
   } else {
     if (typeGiven) {
       throw std::runtime_error("Did not recognize mesh file type " + type);
