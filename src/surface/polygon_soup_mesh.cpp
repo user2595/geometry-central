@@ -162,23 +162,10 @@ void PolygonSoupMesh::readMeshFromFile(std::string filename, bool loadTexture) {
   }
 }
 
-void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
-  polygons.clear();
-  vertexCoordinates.clear();
-
-  // Open the file
-  std::ifstream in(filename);
-  if (!in) throw std::invalid_argument("Could not open mesh file " + filename);
-
-  // parse stl format
+// Assumes that first line has already been consumed
+void PolygonSoupMesh::readMeshFromAsciiStlFile(std::ifstream& in) {
   std::string line;
   std::stringstream ss;
-
-  getline(in, line);
-  if (line.rfind("solid", 0) != 0) {
-    throw std::runtime_error("STL parser for binary files not implemented yet");
-  }
-  // TODO: read stl file name
   size_t lineNum = 1;
 
   auto assertEq = [&](std::string expected, std::string found) {
@@ -236,10 +223,81 @@ void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
     }
 
     nextLine();
-
     assertEq("endfacet", line);
 
+    // Orient face using normal
+    Vector3 faceNormal = cross(vertexCoordinates[face[1]] - vertexCoordinates[face[0]],
+                               vertexCoordinates[face[2]] - vertexCoordinates[face[0]]);
+    if (dot(faceNormal, normal) < 0) {
+      std::reverse(std::begin(face), std::end(face));
+    }
+
     polygons.push_back(face);
+  }
+}
+
+void PolygonSoupMesh::readMeshFromBinaryStlFile(std::ifstream in) {
+  auto parseFloat = [](std::ifstream& in) {
+    char buffer[sizeof(float)];
+    in.read(buffer, sizeof(float));
+    float* floatPointer = (float*)buffer;
+    return *floatPointer;
+  };
+  auto parseVector3 = [&](std::ifstream& in) {
+    double vX = parseFloat(in);
+    double vY = parseFloat(in);
+    double vZ = parseFloat(in);
+    return Vector3{vX, vY, vZ};
+  };
+
+  char header[80];
+  char nTriangleChars[4];
+  in.read(header, 80);
+  in.read(nTriangleChars, 4);
+  unsigned int* intPtr = (unsigned int*)nTriangleChars;
+  size_t nTriangles = *intPtr;
+
+  for (size_t iT = 0; iT < nTriangles; ++iT) {
+    // TODO: store this normal?
+    Vector3 normal = parseVector3(in);
+    std::vector<size_t> face;
+    for (size_t iV = 0; iV < 3; ++iV) {
+      vertexCoordinates.push_back(parseVector3(in));
+      face.push_back(vertexCoordinates.size() - 1);
+    }
+
+    // Orient face using normal
+    Vector3 faceNormal = cross(vertexCoordinates[face[1]] - vertexCoordinates[face[0]],
+                               vertexCoordinates[face[2]] - vertexCoordinates[face[0]]);
+    if (dot(faceNormal, normal) < 0) {
+      std::reverse(std::begin(face), std::end(face));
+    }
+
+    polygons.push_back(face);
+    char dummy[2];
+    in.read(dummy, 2);
+  }
+}
+
+void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
+  // TODO: read stl file name
+  polygons.clear();
+  vertexCoordinates.clear();
+
+  // Open the file
+  std::ifstream in(filename);
+  if (!in) throw std::invalid_argument("Could not open mesh file " + filename);
+
+  // parse stl format
+  std::string line;
+  std::stringstream ss;
+  getline(in, line);
+  std::string token;
+  ss >> token;
+  if (token == "solid") {
+    readMeshFromAsciiStlFile(in);
+  } else {
+    readMeshFromBinaryStlFile(std::ifstream(filename, std::ios::in | std::ios::binary));
   }
 }
 

@@ -33,6 +33,8 @@ public:
 private:
   void readMeshFromFile(std::string filename, bool loadTexture = false);
   void readMeshFromStlFile(std::string filename);
+  void readMeshFromAsciiStlFile(std::ifstream& in);
+  void readMeshFromBinaryStlFile(std::ifstream in);
 };
 
 } // namespace geometrycentral
