@@ -4,6 +4,7 @@
 #include <fstream>
 #include <memory>
 #include <stdexcept>
+#include <unordered_map>
 #include <vector>
 
 #include "geometrycentral/utilities/vector2.h"
@@ -28,6 +29,7 @@ public:
 
   std::vector<std::vector<Vector2>> textureCoordinates;
 
+  void mergeIdentical();
   void mergeByDistance(double tol);
 
 private:

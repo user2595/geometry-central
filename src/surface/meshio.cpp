@@ -110,7 +110,8 @@ std::tuple<std::unique_ptr<HalfedgeMesh>, std::unique_ptr<VertexPositionGeometry
   double duration = (std::clock() - start) / (double)CLOCKS_PER_SEC;
   cout << "File Parsing took " << duration << "s" << endl << endl;
   start = std::clock();
-  soup.mergeByDistance(1e-12);
+  // soup.mergeByDistance(1e-12);
+  soup.mergeIdentical();
   duration = (std::clock() - start) / (double)CLOCKS_PER_SEC;
   cout << "Deduping took " << duration << "s" << endl << endl;
   stripUnusedVertices(soup.vertexCoordinates, soup.polygons);

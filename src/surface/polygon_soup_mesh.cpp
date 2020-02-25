@@ -295,6 +295,41 @@ void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
   }
 }
 
+void PolygonSoupMesh::mergeIdentical() {
+  std::vector<Vector3> compressedPositions;
+  // Store mapping from original vertex index to merged vertex index
+  std::vector<size_t> compressVertex;
+  compressVertex.reserve(vertexCoordinates.size());
+
+  std::unordered_map<Vector3, size_t> canonicalIndex;
+
+  for (size_t iV = 0; iV < vertexCoordinates.size(); ++iV) {
+    Vector3 v = vertexCoordinates[iV];
+    auto it = canonicalIndex.find(v);
+
+    // Check if vertex exists in map or not
+    if (it == canonicalIndex.end()) {
+      compressedPositions.push_back(v);
+      size_t vecIndex = compressedPositions.size() - 1;
+      canonicalIndex[v] = vecIndex;
+      compressVertex.push_back(vecIndex);
+    } else {
+      size_t vecIndex = it->second;
+      compressVertex.push_back(vecIndex);
+    }
+  }
+
+  vertexCoordinates = std::move(compressedPositions);
+  compressedPositions.clear();
+
+  // Update face indices
+  for (std::vector<size_t>& face : polygons) {
+    for (size_t& iV : face) {
+      iV = compressVertex[iV];
+    }
+  }
+}
+
 void PolygonSoupMesh::mergeByDistance(double tol) {
 
   // Store mapping from original vertex index to merged vertex index
