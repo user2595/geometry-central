@@ -3,13 +3,14 @@
 #include <cstdlib>
 #include <fstream>
 #include <memory>
+#include <regex>
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
-#include "geometrycentral/utilities/vector2.h"
-#include "geometrycentral/utilities/vector3.h"
 #include <geometrycentral/utilities/utilities.h>
+#include <geometrycentral/utilities/vector2.h>
+#include <geometrycentral/utilities/vector3.h>
 
 namespace geometrycentral {
 
@@ -29,7 +30,7 @@ public:
 
   std::vector<std::vector<Vector2>> textureCoordinates;
 
-  void mergeIdentical();
+  void mergeIdenticalVertices();
   void mergeByDistance(double tol);
 
 private:

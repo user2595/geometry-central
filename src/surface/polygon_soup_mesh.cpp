@@ -125,17 +125,17 @@ void PolygonSoupMesh::readMeshFromFile(std::string filename, bool loadTexture) {
     ss >> token;
 
     if (token == "v") {
-      double x, y, z;
-      ss >> x >> y >> z;
+      Vector3 position;
+      ss >> position;
 
-      vertexCoordinates.push_back(Vector3{x, y, z});
+      vertexCoordinates.push_back(position);
 
     } else if (token == "vt") {
       if (loadTexture) {
-        double x, y;
-        ss >> x >> y;
+        Vector2 uv;
+        ss >> uv;
 
-        textureCoordinateList.push_back(Vector2{x, y});
+        textureCoordinateList.push_back(uv);
       }
 
     } else if (token == "vn") {
@@ -168,9 +168,11 @@ void PolygonSoupMesh::readMeshFromAsciiStlFile(std::ifstream& in) {
   std::stringstream ss;
   size_t lineNum = 1;
 
-  auto assertEq = [&](std::string expected, std::string found) {
-    if (found != expected) {
-      std::cerr << "Error on line " << lineNum << ". Expected \"" << expected << "\" but found \"" << found << "\""
+  auto assertToken = [&](const std::string& expected) {
+    std::string token;
+    ss >> token;
+    if (token != expected) {
+      std::cerr << "Error on line " << lineNum << ". Expected \"" << expected << "\" but token \"" << token << "\""
                 << std::endl;
       std::cerr << "Full line: \"" << line << "\"" << std::endl;
       exit(1);
@@ -181,49 +183,46 @@ void PolygonSoupMesh::readMeshFromAsciiStlFile(std::ifstream& in) {
     if (!getline(in, line)) {
       return false;
     }
+
     ss = std::stringstream(line);
     lineNum++;
     return true;
   };
 
-  // Parse STL file
-  while (nextLine()) {
-
+  auto startsWithToken = [](const std::string& str, const std::string& prefix) {
+    std::stringstream ss(str);
     std::string token;
-
     ss >> token;
-    if (token == "endsolid") {
-      break;
-    }
-    assertEq("facet", token);
+    return token == prefix;
+  };
 
-    ss >> token;
-    assertEq("normal", token);
+  // Parse STL file
+  while (nextLine() && !startsWithToken(line, "endsolid")) {
+    assertToken("facet");
+    assertToken("normal");
 
     // TODO: store this normal?
-    // TODO: orient face according to normal
-    double nX = 0, nY = 0, nZ = 0;
-    ss >> nX >> nY >> nZ;
-    Vector3 normal{nX, nY, nZ};
+    Vector3 normal;
+    ss >> normal;
 
     nextLine();
 
-    assertEq("outer loop", line);
+    assertToken("outer");
+    assertToken("loop");
+
     std::vector<size_t> face;
+    while (nextLine() && !startsWithToken(line, "endloop")) {
+      assertToken("vertex");
 
-    while (nextLine() && line != "endloop") {
-      ss >> token;
-      assertEq("vertex", token);
-
-      double vX = 0, vY = 0, vZ = 0;
-      ss >> vX >> vY >> vZ;
-      vertexCoordinates.push_back(Vector3{vX, vY, vZ});
+      Vector3 position;
+      ss >> position;
+      vertexCoordinates.push_back(position);
 
       face.push_back(vertexCoordinates.size() - 1);
     }
 
     nextLine();
-    assertEq("endfacet", line);
+    assertToken("endfacet");
 
     // Orient face using normal
     Vector3 faceNormal = cross(vertexCoordinates[face[1]] - vertexCoordinates[face[0]],
@@ -284,8 +283,8 @@ void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
 
   // parse stl format
   std::string line;
-  std::stringstream ss;
   getline(in, line);
+  std::stringstream ss(line);
   std::string token;
   ss >> token;
   if (token == "solid") {
@@ -295,7 +294,7 @@ void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
   }
 }
 
-void PolygonSoupMesh::mergeIdentical() {
+void PolygonSoupMesh::mergeIdenticalVertices() {
   std::vector<Vector3> compressedPositions;
   // Store mapping from original vertex index to merged vertex index
   std::vector<size_t> compressVertex;
