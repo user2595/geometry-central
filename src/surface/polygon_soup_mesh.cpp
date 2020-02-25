@@ -297,53 +297,12 @@ void PolygonSoupMesh::readMeshFromStlFile(std::string filename) {
 
 void PolygonSoupMesh::mergeByDistance(double tol) {
 
-  size_t nV = vertexCoordinates.size();
-
-  std::vector<std::pair<Vector3, size_t>> indexedPositions;
-  indexedPositions.reserve(nV);
-  for (size_t iV = 0; iV < nV; ++iV) {
-    indexedPositions.push_back(std::make_pair(vertexCoordinates[iV], iV));
-  }
-  vertexCoordinates.clear();
-
-  // Sort the vertices in lexicographic order by position
-  // This ensures that all vertices in the same position will be next to each other in the list
-  std::sort(std::begin(indexedPositions), std::end(indexedPositions),
-            [](const std::pair<Vector3, size_t>& a, const std::pair<Vector3, size_t> b) {
-              const Vector3& vA = std::get<0>(a);
-              const Vector3& vB = std::get<0>(b);
-              if (vA.x < vB.x) {
-                return true;
-              } else if (vA.x == vB.x && vA.y < vB.y) {
-                return true;
-              } else if (vA.x == vB.x && vA.y == vB.y && vA.z < vB.z) {
-                return true;
-              } else {
-                return false;
-              }
-            });
-
   // Store mapping from original vertex index to merged vertex index
   std::vector<size_t> compressVertex;
-  compressVertex.resize(nV);
-
-  // Merge vertices together
-  // We just iterate down the sorted list and collect all vertices which
-  // are within tol of the current vertex
-  size_t iV = 0;
-  do {
-    Vector3 pos = std::get<0>(indexedPositions[iV]);
-    vertexCoordinates.push_back(pos);
-
-    Vector3 posV;
-    do {
-      size_t oldIndex = std::get<1>(indexedPositions[iV]);
-      compressVertex[oldIndex] = vertexCoordinates.size() - 1;
-
-      iV++;
-      posV = std::get<0>(indexedPositions[iV]);
-    } while ((pos - posV).norm() < tol);
-  } while (iV < nV);
+  std::vector<Vector3> compressedPositions;
+  std::tie(compressedPositions, compressVertex) = merge(vertexCoordinates, tol);
+  vertexCoordinates = std::move(compressedPositions);
+  compressedPositions.clear();
 
   // Update face indices
   for (std::vector<size_t>& face : polygons) {
@@ -351,6 +310,137 @@ void PolygonSoupMesh::mergeByDistance(double tol) {
       iV = compressVertex[iV];
     }
   }
+}
+
+
+std::tuple<std::vector<Vector3>, std::vector<size_t>> PolygonSoupMesh::merge(const std::vector<Vector3>& points,
+                                                                             double tol) {
+  if (points.size() < 10) {
+    return naiveMerge(points, tol);
+  } else {
+    std::vector<Vector3> mergedPoints;
+    std::vector<size_t> compressVertex;
+    compressVertex.reserve(points.size());
+
+    Vector3 min = points[0];
+    Vector3 max = points[0];
+    for (Vector3 p : points) {
+      min = componentwiseMin(min, p);
+      max = componentwiseMax(max, p);
+    }
+    double xSpread = max.x - min.x;
+    double ySpread = max.y - min.y;
+    double zSpread = max.z - min.z;
+
+    // Maximum side length of a cube that fits in the sphere of radius tol
+    // If all spreads are less than this, then all points are within tol of each other
+    double cbrtTol = tol * 2 / std::sqrt(3);
+    if (xSpread <= cbrtTol && ySpread <= cbrtTol && zSpread <= cbrtTol) {
+      mergedPoints.push_back(points[0]);
+      for (size_t iV = 0; iV < points.size(); ++iV) {
+        compressVertex.push_back(0);
+      }
+      return std::make_tuple(mergedPoints, compressVertex);
+    }
+
+    size_t splitAxis;
+    if (xSpread >= ySpread && xSpread >= zSpread) {
+      splitAxis = 0;
+    } else if (ySpread >= zSpread) {
+      splitAxis = 1;
+    } else {
+      splitAxis = 2;
+    }
+
+    std::array<Vector3, 3> samples{points[rand() % points.size()], points[rand() % points.size()],
+                                   points[rand() % points.size()]};
+    // Clever trick to find the median of 3 numbers
+    // https://stackoverflow.com/questions/17158667/minimum-no-of-comparisons-to-find-median-of-3-numbers
+    auto medianIndex = [](double a, double b, double c) {
+      double x = a - b;
+      double y = b - c;
+      double z = a - c;
+      if (x * y > 0) return 1;
+      if (x * z > 0) return 2;
+      return 0;
+    };
+
+    // Find the median of the 3 samples with respect to splitAxis
+    Vector3 median = samples[medianIndex(samples[0][splitAxis], samples[1][splitAxis], samples[2][splitAxis])];
+
+    // Split the points according to median
+    std::vector<Vector3> lower, upper;
+    std::vector<char> isLower;
+    isLower.reserve(points.size());
+    for (Vector3 p : points) {
+      if (p[splitAxis] <= median[splitAxis] + tol) {
+        lower.push_back(p);
+        isLower.push_back(true);
+      } else {
+        upper.push_back(p);
+        isLower.push_back(false);
+      }
+    }
+
+    std::vector<Vector3> mergedLower, mergedUpper;
+    std::vector<size_t> compressLower, compressUpper;
+    std::tie(mergedLower, compressLower) = merge(lower, tol);
+    std::tie(mergedUpper, compressUpper) = merge(upper, tol);
+
+    // merge together two outputs
+    for (size_t& i : compressUpper) {
+      i += mergedLower.size();
+    }
+    mergedLower.insert(std::end(mergedLower), std::begin(mergedUpper), std::end(mergedUpper));
+
+    std::vector<size_t> compressOut;
+    compressOut.reserve(points.size());
+    size_t lowerIndex = 0, upperIndex = 0;
+    for (size_t iP = 0; iP < points.size(); ++iP) {
+      if (isLower[iP]) {
+        compressOut.push_back(compressLower[lowerIndex]);
+        lowerIndex++;
+      } else {
+        compressOut.push_back(compressUpper[upperIndex]);
+        upperIndex++;
+      }
+    }
+
+    return std::make_tuple(mergedLower, compressOut);
+  }
+}
+
+std::tuple<std::vector<Vector3>, std::vector<size_t>> PolygonSoupMesh::naiveMerge(const std::vector<Vector3>& points,
+                                                                                  double tol) {
+  size_t nV = points.size();
+
+  std::vector<char> visited;
+  visited.reserve(nV);
+  for (size_t iV = 0; iV < nV; ++iV) visited.push_back(false);
+
+  std::vector<Vector3> mergedPoints;
+  std::vector<size_t> compressVertex;
+  compressVertex.resize(nV);
+
+  for (size_t iV = 0; iV < points.size(); ++iV) {
+    if (visited[iV]) {
+      continue;
+    } else {
+      Vector3 pos = points[iV];
+      mergedPoints.push_back(pos);
+      compressVertex[iV] = mergedPoints.size() - 1;
+
+      // Mark all future vertices at this position as visited
+      for (size_t iW = iV + 1; iW < nV; ++iW) {
+        Vector3 posW = points[iW];
+        if ((pos - posW).norm() < tol) {
+          compressVertex[iW] = compressVertex[iV];
+          visited[iW] = true;
+        }
+      }
+    }
+  }
+  return std::make_tuple(mergedPoints, compressVertex);
 }
 
 void PolygonSoupMesh::triangulate() {

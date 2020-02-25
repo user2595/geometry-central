@@ -35,6 +35,9 @@ private:
   void readMeshFromStlFile(std::string filename);
   void readMeshFromAsciiStlFile(std::ifstream& in);
   void readMeshFromBinaryStlFile(std::ifstream in);
+
+  std::tuple<std::vector<Vector3>, std::vector<size_t>> merge(const std::vector<Vector3>& points, double tol);
+  std::tuple<std::vector<Vector3>, std::vector<size_t>> naiveMerge(const std::vector<Vector3>& points, double tol);
 };
 
 } // namespace geometrycentral
