@@ -299,154 +299,51 @@ void PolygonSoupMesh::mergeByDistance(double tol) {
 
   size_t nV = vertexCoordinates.size();
 
-  std::vector<Vector3> rawVertexPositions = std::move(vertexCoordinates);
+  std::vector<std::pair<Vector3, size_t>> indexedPositions;
+  indexedPositions.reserve(nV);
+  for (size_t iV = 0; iV < nV; ++iV) {
+    indexedPositions.push_back(std::make_pair(vertexCoordinates[iV], iV));
+  }
   vertexCoordinates.clear();
 
-  // dedupe vertices so that we can build a mesh later if we want to
-  std::vector<size_t> compressVertex;
-  compressVertex.resize(rawVertexPositions.size());
-
-  if (nV < 1e6) {
-    std::vector<char> visited;
-    visited.reserve(nV);
-    for (size_t iV = 0; iV < nV; ++iV) visited[iV] = false;
-
-    for (size_t iV = 0; iV < rawVertexPositions.size(); ++iV) {
-      if (visited[iV]) {
-        continue;
-      } else {
-        Vector3 pos = rawVertexPositions[iV];
-        vertexCoordinates.push_back(pos);
-        compressVertex[iV] = vertexCoordinates.size() - 1;
-
-        // Mark all future vertices at this position as visited
-        for (size_t iW = iV + 1; iW < nV; ++iW) {
-          Vector3 posW = rawVertexPositions[iW];
-          if ((pos - posW).norm() < tol) {
-            compressVertex[iW] = compressVertex[iV];
-            visited[iW] = true;
-          }
-        }
-      }
-      if (iV % (size_t)1e2 == 0) {
-        std::cout << "\r" << iV << " / " << nV << " " << ((double)iV) / ((double)nV) * 100.0 << "%\t\t" << std::flush;
-      }
-    }
-    std::cout << std::endl;
-  } else {
-
-    // TODO: Smarter spatial data structure?
-
-    double minX = rawVertexPositions[0].x;
-    double maxX = rawVertexPositions[0].x;
-    double minY = rawVertexPositions[0].y;
-    double maxY = rawVertexPositions[0].y;
-    double minZ = rawVertexPositions[0].z;
-    double maxZ = rawVertexPositions[0].z;
-
-    bool* visited = new bool[nV];
-    for (size_t iV = 0; iV < nV; ++iV) {
-      visited[iV] = false;
-      minX = fmin(minX, rawVertexPositions[iV].x);
-      minY = fmin(minY, rawVertexPositions[iV].y);
-      minZ = fmin(minZ, rawVertexPositions[iV].z);
-      maxX = fmax(maxX, rawVertexPositions[iV].x);
-      maxY = fmax(maxY, rawVertexPositions[iV].y);
-      maxZ = fmax(maxZ, rawVertexPositions[iV].z);
-    }
-
-    size_t gridSize = std::cbrt((double)nV) / 8;
-    size_t nBuckets = gridSize * gridSize * gridSize;
-    std::vector<std::vector<size_t>> vertexBuckets;
-    vertexBuckets.reserve(nBuckets);
-    for (size_t iB = 0; iB < nBuckets; ++iB) {
-      vertexBuckets.push_back(std::vector<size_t>());
-      vertexBuckets[iB].reserve(((double)nV) / ((double)nBuckets));
-    }
-
-    auto onBoundary = [&](Vector3 pos, int& xBoundary, int& yBoundary, int& zBoundary) {
-      double xIndex = fmod((pos.x - minX) / (maxX - minX) * gridSize * 0.99, 1);
-      double yIndex = fmod((pos.y - minY) / (maxY - minY) * gridSize * 0.99, 1);
-      double zIndex = fmod((pos.z - minZ) / (maxZ - minZ) * gridSize * 0.99, 1);
-
-      xBoundary = (xIndex < tol) ? -1 : (xIndex >= 1 - tol) ? 1 : 0;
-      yBoundary = (yIndex < tol) ? -1 : (yIndex >= 1 - tol) ? 1 : 0;
-      zBoundary = (zIndex < tol) ? -1 : (zIndex >= 1 - tol) ? 1 : 0;
-    };
-
-    auto getBucketCoords = [&](Vector3 pos) {
-      // Multiply by 0.99 so that the answer is strictly less than gridSize
-      int xIndex = (int)((pos.x - minX) / (maxX - minX) * gridSize * 0.99);
-      int yIndex = (int)((pos.y - minY) / (maxY - minY) * gridSize * 0.99);
-      int zIndex = (int)((pos.z - minZ) / (maxZ - minZ) * gridSize * 0.99);
-      return std::array<int, 3>{xIndex, yIndex, zIndex};
-    };
-
-    auto getBucketIndex = [&](std::array<int, 3> bucketCoords) {
-      return bucketCoords[0] + gridSize * bucketCoords[1] + gridSize * gridSize * bucketCoords[2];
-    };
-
-    for (size_t iV = 0; iV < nV; ++iV) {
-      Vector3 pos = rawVertexPositions[iV];
-      size_t vBucketIndex = getBucketIndex(getBucketCoords(pos));
-
-      if (vBucketIndex >= nBuckets) {
-        std::cerr << "Error: bucket index " << vBucketIndex << " bigger than maximum " << nBuckets << std::endl;
-        exit(1);
-      }
-      vertexBuckets[vBucketIndex].push_back(iV);
-    }
-
-    for (size_t iV = 0; iV < nV; ++iV) {
-      if (visited[iV]) {
-        continue;
-      } else {
-        Vector3 pos = rawVertexPositions[iV];
-        vertexCoordinates.push_back(pos);
-        compressVertex[iV] = vertexCoordinates.size() - 1;
-
-        // Check neighboring buckets for nearby vertices
-        std::array<int, 3> bucketCoords = getBucketCoords(pos);
-        int xBoundary, yBoundary, zBoundary;
-        onBoundary(pos, xBoundary, yBoundary, zBoundary);
-        std::set<int> dxSet{0, xBoundary};
-        std::set<int> dySet{0, yBoundary};
-        std::set<int> dzSet{0, zBoundary};
-
-
-        for (int dx : dxSet) {
-          for (int dy : dxSet) {
-            for (int dz : dxSet) {
-              std::array<int, 3> neighborBucketCoords = bucketCoords;
-              neighborBucketCoords[0] += dx;
-              neighborBucketCoords[1] += dy;
-              neighborBucketCoords[2] += dz;
-              if (neighborBucketCoords[0] >= 0 && neighborBucketCoords[0] < (int)gridSize &&
-                  neighborBucketCoords[1] >= 0 && neighborBucketCoords[1] < (int)gridSize &&
-                  neighborBucketCoords[2] >= 0 && neighborBucketCoords[2] < (int)gridSize) {
-
-                for (size_t iW : vertexBuckets[getBucketIndex(neighborBucketCoords)]) {
-                  Vector3 posW = rawVertexPositions[iW];
-                  if ((pos - posW).norm() < tol) {
-
-                    compressVertex[iW] = compressVertex[iV];
-                    visited[iW] = true;
-                  }
-                }
+  // Sort the vertices in lexicographic order by position
+  // This ensures that all vertices in the same position will be next to each other in the list
+  std::sort(std::begin(indexedPositions), std::end(indexedPositions),
+            [](const std::pair<Vector3, size_t>& a, const std::pair<Vector3, size_t> b) {
+              const Vector3& vA = std::get<0>(a);
+              const Vector3& vB = std::get<0>(b);
+              if (vA.x < vB.x) {
+                return true;
+              } else if (vA.x == vB.x && vA.y < vB.y) {
+                return true;
+              } else if (vA.x == vB.x && vA.y == vB.y && vA.z < vB.z) {
+                return true;
+              } else {
+                return false;
               }
-            }
-          }
-        }
-      }
+            });
 
-      if (iV % (size_t)1e5 == 0) {
-        std::cout << "\r" << iV << " / " << nV << " " << ((double)iV) / ((double)nV) * 100.0 << "%\t\t" << std::flush;
-      }
-    }
-    delete[] visited;
-  }
-  std::cout << std::endl;
+  // Store mapping from original vertex index to merged vertex index
+  std::vector<size_t> compressVertex;
+  compressVertex.resize(nV);
 
+  // Merge vertices together
+  // We just iterate down the sorted list and collect all vertices which
+  // are within tol of the current vertex
+  size_t iV = 0;
+  do {
+    Vector3 pos = std::get<0>(indexedPositions[iV]);
+    vertexCoordinates.push_back(pos);
+
+    Vector3 posV;
+    do {
+      size_t oldIndex = std::get<1>(indexedPositions[iV]);
+      compressVertex[oldIndex] = vertexCoordinates.size() - 1;
+
+      iV++;
+      posV = std::get<0>(indexedPositions[iV]);
+    } while ((pos - posV).norm() < tol);
+  } while (iV < nV);
 
   // Update face indices
   for (std::vector<size_t>& face : polygons) {
