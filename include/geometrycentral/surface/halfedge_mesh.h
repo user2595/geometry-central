@@ -43,14 +43,14 @@ public:
 
   // Methods for range-based for loops
   // Example: for(Vertex v : mesh.vertices()) { ... }
-  HalfedgeSet halfedges();
-  HalfedgeInteriorSet interiorHalfedges();
-  HalfedgeExteriorSet exteriorHalfedges();
-  CornerSet corners();
-  VertexSet vertices();
-  EdgeSet edges();
-  FaceSet faces();
-  BoundaryLoopSet boundaryLoops();
+  HalfedgeSet halfedges() const;
+  HalfedgeInteriorSet interiorHalfedges() const;
+  HalfedgeExteriorSet exteriorHalfedges() const;
+  CornerSet corners() const;
+  VertexSet vertices() const;
+  EdgeSet edges() const;
+  FaceSet faces() const;
+  BoundaryLoopSet boundaryLoops() const;
 
   // Methods for accessing elements by index
   // only valid when the  mesh is compressed

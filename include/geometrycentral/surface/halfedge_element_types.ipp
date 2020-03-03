@@ -15,7 +15,7 @@ namespace surface {
 template<typename T> 
 Element<T>::Element() {}
 template<typename T> 
-Element<T>::Element(HalfedgeMesh* mesh_, size_t ind_) : mesh(mesh_), ind(ind_) {}
+Element<T>::Element(const HalfedgeMesh* mesh_, size_t ind_) : mesh(mesh_), ind(ind_) {}
 template<typename T> 
 Element<T>::Element(const DynamicElement<T>& e) : mesh(e.getMesh()), ind(e.getIndex()) {}
 
@@ -120,7 +120,7 @@ void DynamicElement<S>::deregisterWithMesh() {
 
 // Base iterators
 template <typename F>
-inline RangeIteratorBase<F>::RangeIteratorBase(HalfedgeMesh* mesh_, size_t iStart_, size_t iEnd_) : mesh(mesh_), iCurr(iStart_), iEnd(iEnd_) {
+inline RangeIteratorBase<F>::RangeIteratorBase(const HalfedgeMesh* mesh_, size_t iStart_, size_t iEnd_) : mesh(mesh_), iCurr(iStart_), iEnd(iEnd_) {
   if (iCurr != iEnd && !F::elementOkay(*mesh, iCurr)) {
     this->operator++();
   }
@@ -149,7 +149,7 @@ template <typename F>
 inline typename F::Etype RangeIteratorBase<F>::operator*() const { return typename F::Etype(mesh, iCurr); }
 
 template <typename F>
-RangeSetBase<F>::RangeSetBase(HalfedgeMesh* mesh_, size_t iStart_, size_t iEnd_) : mesh(mesh_), iStart(iStart_), iEnd(iEnd_) {}  
+RangeSetBase<F>::RangeSetBase(const HalfedgeMesh* mesh_, size_t iStart_, size_t iEnd_) : mesh(mesh_), iStart(iStart_), iEnd(iEnd_) {}  
 
 template <typename F>
 inline RangeIteratorBase<F> RangeSetBase<F>::begin() const { return RangeIteratorBase<F>(mesh, iStart, iEnd); }
@@ -273,6 +273,8 @@ inline bool CornerRangeF::elementOkay(const HalfedgeMesh& mesh, size_t ind) {
 
 // Navigators
 inline Halfedge Edge::halfedge() const { return Halfedge(mesh, HalfedgeMesh::eHalfedge(ind)); }
+inline Vertex Edge::src() const { return halfedge().vertex(); };
+inline Vertex Edge::dst() const { return halfedge().twin().vertex(); };
 
 // Properties
 inline bool Edge::isBoundary() const { return !halfedge().isInterior() || !halfedge().twin().isInterior(); }

@@ -42,14 +42,14 @@ inline bool HalfedgeMesh::faceIsDead(size_t iF)        const { return fHalfedge[
 
 // Methods for iterating over mesh elements w/ range-based for loops ===========
 
-inline VertexSet HalfedgeMesh::vertices()                        { return VertexSet(this, 0, nVerticesFillCount); }
-inline HalfedgeSet HalfedgeMesh::halfedges()                     { return HalfedgeSet(this, 0, nHalfedgesFillCount); }
-inline HalfedgeInteriorSet HalfedgeMesh::interiorHalfedges()     { return HalfedgeInteriorSet(this, 0, nHalfedgesFillCount); }
-inline HalfedgeExteriorSet HalfedgeMesh::exteriorHalfedges()     { return HalfedgeExteriorSet(this, 0, nHalfedgesFillCount); }
-inline CornerSet HalfedgeMesh::corners()                         { return CornerSet(this, 0, nHalfedgesFillCount); }
-inline EdgeSet HalfedgeMesh::edges()                             { return EdgeSet(this, 0, nEdgesFillCount()); }
-inline FaceSet HalfedgeMesh::faces()                             { return FaceSet(this, 0, nFacesFillCount); }
-inline BoundaryLoopSet HalfedgeMesh::boundaryLoops()             { return BoundaryLoopSet(this, 0, nBoundaryLoopsFillCount); }
+inline VertexSet HalfedgeMesh::vertices()                        const { return VertexSet(this, 0, nVerticesFillCount); }
+inline HalfedgeSet HalfedgeMesh::halfedges()                     const { return HalfedgeSet(this, 0, nHalfedgesFillCount); }
+inline HalfedgeInteriorSet HalfedgeMesh::interiorHalfedges()     const { return HalfedgeInteriorSet(this, 0, nHalfedgesFillCount); }
+inline HalfedgeExteriorSet HalfedgeMesh::exteriorHalfedges()     const { return HalfedgeExteriorSet(this, 0, nHalfedgesFillCount); }
+inline CornerSet HalfedgeMesh::corners()                         const { return CornerSet(this, 0, nHalfedgesFillCount); }
+inline EdgeSet HalfedgeMesh::edges()                             const { return EdgeSet(this, 0, nEdgesFillCount()); }
+inline FaceSet HalfedgeMesh::faces()                             const { return FaceSet(this, 0, nFacesFillCount); }
+inline BoundaryLoopSet HalfedgeMesh::boundaryLoops()             const { return BoundaryLoopSet(this, 0, nBoundaryLoopsFillCount); }
 
 // Methods for accessing elements by index =====================================
 // Note that these are only valid when the mesh is compressed.

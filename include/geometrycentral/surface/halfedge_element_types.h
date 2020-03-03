@@ -101,9 +101,9 @@ template <typename T>
 class Element {
 
 public:
-  Element();                               // construct an empty (null) element
-  Element(HalfedgeMesh* mesh, size_t ind); // construct pointing to the i'th element of that type on a mesh.
-  Element(const DynamicElement<T>& e);     // construct from a dynamic element of matching type
+  Element();                                     // construct an empty (null) element
+  Element(const HalfedgeMesh* mesh, size_t ind); // construct pointing to the i'th element of that type on a mesh.
+  Element(const DynamicElement<T>& e);           // construct from a dynamic element of matching type
 
   inline bool operator==(const Element<T>& other) const;
   inline bool operator!=(const Element<T>& other) const;
@@ -123,7 +123,7 @@ public:
   HalfedgeMesh* getMesh() const;
 
 protected:
-  HalfedgeMesh* mesh = nullptr;
+  const HalfedgeMesh* mesh = nullptr;
   size_t ind = INVALID_IND;
 
   // Friends
@@ -171,14 +171,14 @@ template <typename F>
 class RangeIteratorBase {
 
 public:
-  RangeIteratorBase(HalfedgeMesh* mesh_, size_t iStart_, size_t iEnd_);
+  RangeIteratorBase(const HalfedgeMesh* mesh_, size_t iStart_, size_t iEnd_);
   const RangeIteratorBase& operator++();
   bool operator==(const RangeIteratorBase& other) const;
   bool operator!=(const RangeIteratorBase& other) const;
   typename F::Etype operator*() const;
 
 private:
-  HalfedgeMesh* mesh;
+  const HalfedgeMesh* mesh;
   size_t iCurr;
   size_t iEnd;
 };
@@ -186,12 +186,12 @@ private:
 template <typename F>
 class RangeSetBase {
 public:
-  RangeSetBase(HalfedgeMesh* mesh_, size_t iStart_, size_t iEnd_);
+  RangeSetBase(const HalfedgeMesh* mesh_, size_t iStart_, size_t iEnd_);
   RangeIteratorBase<F> begin() const;
   RangeIteratorBase<F> end() const;
 
 private:
-  HalfedgeMesh* mesh;
+  const HalfedgeMesh* mesh;
   size_t iStart, iEnd;
 };
 
@@ -323,6 +323,8 @@ public:
 
   // Navigators
   Halfedge halfedge() const;
+  Vertex src() const;
+  Vertex dst() const;
 
   // Properties
   bool isBoundary() const;
