@@ -3,7 +3,6 @@
 #include "geometrycentral/surface/halfedge_containers.h"
 #include "geometrycentral/surface/halfedge_factories.h"
 #include "geometrycentral/surface/halfedge_mesh.h"
-#include "geometrycentral/surface/polygon_soup_mesh.h"
 
 #include "happly.h"
 
@@ -288,6 +287,36 @@ std::unique_ptr<HalfedgeMesh> loadConnectivity(std::string filename, bool verbos
 
 
 // ======= Output =======
+
+bool WavefrontOBJ::write(std::string filename, const PolygonSoupMesh& soup) {
+  std::ofstream out;
+  if (!openStream(out, filename)) return false;
+
+  // TODO: count edges in polygon soup
+  out << "# Mesh exported from GeometryCentral" << endl;
+  out << "#  vertices: " << soup.vertexCoordinates.size() << endl;
+  out << "#     edges: "
+      << "NOT IMPLEMENTED YET" << endl;
+  out << "#     faces: " << soup.polygons.size() << endl;
+
+  out << "# texture coordinates: NO" << endl;
+  out << "# normals: NO" << endl;
+  cout << endl;
+
+  for (Vector3 v : soup.vertexCoordinates) {
+    out << "v " << v.x << " " << v.y << " " << v.z << endl;
+  }
+
+  for (std::vector<size_t> f : soup.polygons) {
+    out << "f";
+    for (size_t iV : f) {
+      out << " " << std::to_string(iV) << "//";
+    }
+    out << endl;
+  }
+
+  return true;
+}
 
 bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry) {
   std::ofstream out;

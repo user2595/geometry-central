@@ -2,6 +2,7 @@
 
 // The MeshIO class provides a variety of methods for mesh input/output.
 
+#include "geometrycentral/surface/polygon_soup_mesh.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
 
 #include <fstream>
@@ -27,6 +28,7 @@ std::unique_ptr<HalfedgeMesh> loadConnectivity(std::string filename, bool verbos
 
 class WavefrontOBJ {
 public:
+  static bool write(std::string filename, const PolygonSoupMesh& soup);
   static bool write(std::string filename, EmbeddedGeometryInterface& geometry);
   static bool write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector2>& texcoords);
   static bool write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector3>& normals);
