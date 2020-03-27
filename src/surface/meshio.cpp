@@ -18,8 +18,9 @@ namespace surface {
 
 // ======= Input =======
 
-// strip unused vertices from face-vertex lists
-void stripUnusedVertices(std::vector<Vector3>& positions, std::vector<std::vector<size_t>>& faceIndices) {
+// strip unused vertices from face-vertex lists. Returns the mapping from old vertices to new vertices
+std::vector<size_t> stripUnusedVertices(std::vector<Vector3>& positions,
+                                        std::vector<std::vector<size_t>>& faceIndices) {
 
   size_t nVert = positions.size();
 
@@ -39,9 +40,14 @@ void stripUnusedVertices(std::vector<Vector3>& positions, std::vector<std::vecto
     }
   }
 
+  // TODO: this is probably useless work most of the time
   // Early exit if dense
   if (nUsedVerts == nVert) {
-    return;
+    std::vector<size_t> identity(nVert);
+    for (size_t i = 0; i < nVert; ++i) {
+      identity.push_back(nVert);
+    }
+    return identity;
   }
 
   // Else: strip unused vertices and re-index faces
@@ -60,6 +66,8 @@ void stripUnusedVertices(std::vector<Vector3>& positions, std::vector<std::vecto
       i = oldToNewVertexInd[i];
     }
   }
+
+  return oldToNewVertexInd;
 }
 
 
@@ -212,6 +220,7 @@ bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geomet
 
   writeHeader(out, geometry);
   out << "# texture coordinates: NO" << endl;
+  out << "# normals: NO" << endl;
   cout << endl;
 
   writeVertices(out, geometry);
@@ -222,19 +231,21 @@ bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geomet
   return true;
 }
 
-bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector2>& texcoords) {
+bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector3>& normals) {
   std::ofstream out;
   if (!openStream(out, filename)) return false;
 
   writeHeader(out, geometry);
-  out << "# texture coordinates: YES" << endl;
+  out << "# texture coordinates: NO" << endl;
+  out << "# normals: YES" << endl;
   cout << endl;
 
   writeVertices(out, geometry);
-  writeTexCoords(out, geometry, texcoords);
+  writeNormals(out, geometry, normals);
 
-  bool useTexCoords = true;
-  writeFaces(out, geometry, useTexCoords);
+  bool useTexCoords = false;
+  bool useNormals = true;
+  writeFaces(out, geometry, useTexCoords, useNormals);
 
   return true;
 }
@@ -264,24 +275,25 @@ void WavefrontOBJ::writeHeader(std::ofstream& out, EmbeddedGeometryInterface& ge
 void WavefrontOBJ::writeVertices(std::ofstream& out, EmbeddedGeometryInterface& geometry) {
   HalfedgeMesh& mesh(geometry.mesh);
   geometry.requireVertexPositions();
+  VertexData<Vector3> pos = geometry.vertexPositions;
 
   for (Vertex v : mesh.vertices()) {
-    Vector3 p = geometry.vertexPositions[v];
+    Vector3 p = pos[v];
     out << "v " << p.x << " " << p.y << " " << p.z << endl;
   }
 }
 
-void WavefrontOBJ::writeTexCoords(std::ofstream& out, EmbeddedGeometryInterface& geometry,
-                                  CornerData<Vector2>& texcoords) {
+void WavefrontOBJ::writeNormals(std::ofstream& out, EmbeddedGeometryInterface& geometry, CornerData<Vector3>& normals) {
   HalfedgeMesh& mesh(geometry.mesh);
 
   for (Corner c : mesh.corners()) {
-    Vector2 z = texcoords[c];
-    out << "vt " << z.x << " " << z.y << endl;
+    Vector3 n = normals[c];
+    out << "vn " << n.x << " " << n.y << " " << n.z << endl;
   }
 }
 
-void WavefrontOBJ::writeFaces(std::ofstream& out, EmbeddedGeometryInterface& geometry, bool useTexCoords) {
+void WavefrontOBJ::writeFaces(std::ofstream& out, EmbeddedGeometryInterface& geometry, bool useTexCoords,
+                              bool useNormalCoords) {
   HalfedgeMesh& mesh(geometry.mesh);
 
   // Get vertex indices
@@ -290,7 +302,8 @@ void WavefrontOBJ::writeFaces(std::ofstream& out, EmbeddedGeometryInterface& geo
 
   auto indexFn = [&](Corner c) {
     std::string texCoordString = (useTexCoords) ? std::to_string(cIndices[c] + 1) : "";
-    return " " + std::to_string(indices[c.vertex()] + 1) + "/" + texCoordString;
+    std::string normalCoordString = (useNormalCoords) ? std::to_string(cIndices[c] + 1) : "";
+    return " " + std::to_string(indices[c.vertex()] + 1) + "/" + texCoordString + "/" + normalCoordString;
   };
 
   for (Face f : mesh.faces()) {
