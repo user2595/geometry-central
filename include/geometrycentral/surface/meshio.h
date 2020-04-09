@@ -51,6 +51,7 @@ CornerData<Vector2> packToParam(SurfaceMesh& mesh, VertexData<double>& valsX, Ve
 // Legacy writer, prefer on of the variants above
 class WavefrontOBJ {
 public:
+  static bool write(std::string filename, const PolygonSoupMesh& soup);
   static bool write(std::string filename, EmbeddedGeometryInterface& geometry);
   static bool write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector2>& texcoords);
 
