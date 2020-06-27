@@ -35,6 +35,7 @@ A common pattern in geometry code is to maintain precomputed arrays of values th
 All geometry objects automatically maintain of system of caches for geometric quantities; the user can simply call (for instance) `geometry.requireFaceAreas()` at the beginning of a subroutine to ensure that the face area buffer is populated, then access `geometry.faceAreas[f]` in any subsequent code. This strategy keep storage and computation to a minimum by sharing repeated values across any use of the geometry object.
 
 The following example demonstrates immediate computation vs cached quantities.
+<!--- HalfedgeMesh* mesh = defaultMeshPtr.release();-->
 ```cpp
 VertexPositionGeometry& geometry = /* ... */;
 

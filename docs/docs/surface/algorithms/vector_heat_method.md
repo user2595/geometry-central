@@ -30,12 +30,14 @@ Given scalar data defined at isolated source locations on a surface, extend it t
 
 Example:
 ```cpp
+#include "geometrycentral/surface/vector_heat_method.h"
+
 // your mesh and geometry
-VertexPositionGeometry geometry;
-HalfedgeMesh mesh;
+VertexPositionGeometry& geometry = /*  */;
+HalfedgeMesh& mesh = /*  */;
 
 // construct a solver
-VectorHeatSolver vhmSolver(geometry);
+VectorHeatMethodSolver vhmSolver(geometry);
 
 // some interesting source values
 std::vector<std::tuple<Vertex, double>> points;

@@ -8,6 +8,7 @@ Use these routines to iterate over all of the elements in the mesh.
 
 ??? func "`#!cpp HalfedgeMesh::vertices()`"
     Iterate over the vertices in a mesh.
+    <!--- HalfedgeMesh& mesh = *defaultMeshPtr; -->
     ```cpp
     for(Vertex v : mesh.vertices()) {
       // do science here
@@ -16,25 +17,28 @@ Use these routines to iterate over all of the elements in the mesh.
 
 ??? func "`#!cpp HalfedgeMesh::halfedges()`"
     Iterate over all of the halfedges in a mesh (both real and imaginary, if the mesh has boundary).
+    <!--- HalfedgeMesh& mesh = *defaultMeshPtr; -->
     ```cpp
     for(Halfedge he : mesh.halfedges()) {
       // do science here
     }
     ```
 
-??? func "`#!cpp HalfedgeMesh::realHalfedges()`"
+??? func "`#!cpp HalfedgeMesh::interiorHalfedges()`"
     Iterate over the real halfedges in a mesh.
+    <!--- HalfedgeMesh& mesh = *defaultMeshPtr; -->
     ```cpp
-    for(Halfedge he : mesh.realHalfedges()) {
+    for(Halfedge he : mesh.interiorHalfedges()) {
       // do science here
     }
     ```
     Note that on a boundary edge between vertices `i <--> j`, this set will only include a halfedge from `i --> j`, but not from `j --> i` (or vice versa).
 
-??? func "`#!cpp HalfedgeMesh::imaginaryHalfedges()`"
+??? func "`#!cpp HalfedgeMesh::exteriorHalfedges()`"
     Iterate over the imaginary halfedges in a mesh.
+    <!--- HalfedgeMesh& mesh = *defaultMeshPtr; -->
     ```cpp
-    for(Halfedge he : mesh.imaginaryHalfedges()) {
+    for(Halfedge he : mesh.exteriorHalfedges()) {
       // do science here
     }
     ```
@@ -42,6 +46,7 @@ Use these routines to iterate over all of the elements in the mesh.
 
 ??? func "`#!cpp HalfedgeMesh::edges()`"
     Iterate over the edges in a mesh.
+    <!--- HalfedgeMesh& mesh = *defaultMeshPtr; -->
     ```cpp
     for(Edge e : mesh.edges()) {
       // do science here
@@ -50,6 +55,7 @@ Use these routines to iterate over all of the elements in the mesh.
 
 ??? func "`#!cpp HalfedgeMesh::faces()`"
     Iterate over the faces in a mesh.
+    <!--- HalfedgeMesh& mesh = *defaultMeshPtr; -->
     ```cpp
     for(Face f : mesh.faces()) {
       // do science here
@@ -75,6 +81,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 
 ??? func "`#!cpp Vertex::outgoingHalfedges()`"
     Iterate over the halfedges which point outward from a vertex.
+    <!--- Vertex vert = defaultMeshPtr->vertex(0); -->
     ```cpp
     for(Halfedge he : vert.outgoingHalfedges()) {
       assert(he.vertex() == vert); // true
@@ -84,6 +91,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 
 ??? func "`#!cpp Vertex::incomingHalfedges()`"
     Iterate over the halfedges which point inward at a vertex.
+    <!--- Vertex vert = defaultMeshPtr->vertex(0); -->
     ```cpp
     for(Halfedge he : vert.incomingHalfedges()) {
       assert(he.twin().vertex() == vert); // true
@@ -94,6 +102,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 ??? func "`#!cpp Vertex::adjacentVertices()`"
 
     Iterate over the vertices edge-connected to this vertex.
+    <!--- Vertex vert = defaultMeshPtr->vertex(0); -->
     ```cpp
     for(Vertex v : vert.adjacentVertices()) {
       // do science here
@@ -103,6 +112,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 ??? func "`#!cpp Vertex::adjacentEdges()`"
 
     Iterate over the edges incident on this vertex.
+    <!--- Vertex vert = defaultMeshPtr->vertex(0); -->
     ```cpp
     for(Edge e : vert.adjacentEdges()) {
       // do science here
@@ -112,6 +122,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 ??? func "`#!cpp Vertex::adjacentFaces()`"
 
     Iterate over the faces incident on this vertex.
+    <!--- Vertex vert = defaultMeshPtr->vertex(0); -->
     ```cpp
     for(Face f : vert.adjacentFaces()) {
       // do science here
@@ -123,6 +134,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 ??? func "`#!cpp Edge::adjacentHalfedges()`"
 
     Iterate over the two halfedges incident on this edge.
+    <!--- Edge edge = defaultMeshPtr->edge(0); -->
     ```cpp
     for(Halfedge he : edge.adjacentHalfedges()) {
       // do science here
@@ -132,6 +144,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 ??? func "`#!cpp Edge::adjacentFaces()`"
 
     Iterate over the (one or two) faces incident on this edge.
+    <!--- Edge edge = defaultMeshPtr->edge(0); -->
     ```cpp
     for(Face f : edge.adjacentFaces()) {
       // do science here
@@ -142,6 +155,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 
 ??? func "`#!cpp Face::adjacentVertices()`"
     Iterate over the vertices adjacent to a face.
+    <!--- Face face = defaultMeshPtr->face(0); -->
     ```cpp
     for(Vertex v : face.adjacentVertices()) {
       // do science here
@@ -150,6 +164,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 
 ??? func "`#!cpp Face::adjacentHalfedges()`"
     Iterate over the halfedges incident on a face.
+    <!--- Face face = defaultMeshPtr->face(0); -->
     ```cpp
     for(Halfedge he : face.adjacentHalfedges()) {
       // do science here
@@ -158,6 +173,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 
 ??? func "`#!cpp Face::adjacentEdges()`"
     Iterate over the edges on the boundary of a face.
+    <!--- Face face = defaultMeshPtr->face(0); -->
     ```cpp
     for(Edge e : face.adjacentEdges()) {
       // do science here
@@ -166,6 +182,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 
 ??? func "`#!cpp Face::adjacentFaces()`"
     Iterate over the faces adjacent to a face, across each edge.
+    <!--- Face face = defaultMeshPtr->face(0); -->
     ```cpp
     for(Face f : face.adjacentFaces()) {
       // do science here
@@ -177,6 +194,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 
 ??? func "`#!cpp BoundaryLoop::adjacentVertices()`"
     Iterate over the vertices adjacent to a boundary loop.
+    <!--- BoundaryLoop boundaryLoop = defaultMeshPtr->boundaryLoop(0); -->
     ```cpp
     for(Vertex v : boundaryLoop.adjacentVertices()) {
       // do science here
@@ -185,6 +203,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 
 ??? func "`#!cpp BoundaryLoop::adjacentHalfedges()`"
     Iterate over the (exterior) halfedges incident on a boundary loop.
+    <!--- BoundaryLoop boundaryLoop = defaultMeshPtr->boundaryLoop(0); -->
     ```cpp
     for(Halfedge he : boundaryLoop.adjacentHalfedges()) {
       // do science here
@@ -193,6 +212,7 @@ Use these routines to iterate over the neighbors of a mesh element.
 
 ??? func "`#!cpp BoundaryLoop::adjacentEdges()`"
     Iterate over the edges on the boundary of a boundary loop.
+    <!--- BoundaryLoop boundaryLoop = defaultMeshPtr->boundaryLoop(0); -->
     ```cpp
     for(Edge e : boundaryLoop.adjacentEdges()) {
       // do science here

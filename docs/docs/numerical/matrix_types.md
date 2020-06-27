@@ -12,6 +12,7 @@ Two typedefs are used extensively throughout geometry central to make the defaul
 ??? func "`#!cpp Vector<T>`"
 
     A templated vector typedef, to Eigen's vector type.
+    <!--- NO TEST -->
     ```cpp
     template <typename T>
     using Vector = Eigen::Matrix<T, Eigen::Dynamic, 1>;
@@ -23,6 +24,7 @@ Two typedefs are used extensively throughout geometry central to make the defaul
 ??? func "`#!cpp SparseMatrix<T>`"
 
     A templated sparse matrix typedef, to Eigen's sparse matrix type.
+    <!--- NO TEST -->
     ```cpp
     template <typename T>
     using SparseMatrix = Eigen::SparseMatrix<T>;

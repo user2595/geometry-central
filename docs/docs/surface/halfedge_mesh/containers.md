@@ -1,5 +1,6 @@
 The halfedge mesh class is equipped with a system of containers for associating data with mesh vertices, halfedges, edges, and faces. For instance, to represent a scalar value at vertices, or a vector value at faces, one can use 
 
+<!--- HalfedgeMesh& mesh = *defaultMeshPtr;-->
 ```cpp
 // on vertices
 VertexData<double> myVertexScalar(mesh);
@@ -51,6 +52,7 @@ Additionally, see the vector-based initializers in [vector interoperability](con
     Access data stored in the container with a reference to a mesh element. A const version also exists; expect semantics like `std::vector<>`.
 
     For example:
+    <!--- HalfedgeMesh& mesh = *defaultMeshPtr;-->
     ```cpp
     // on vertices
     VertexData<double> myVertexScalar(mesh);
@@ -68,14 +70,15 @@ Additionally, see the vector-based initializers in [vector interoperability](con
     Must have `0 <= ind < N`, where `N` is the number of elements of that type.
 
     For example:
+    <!--- HalfedgeMesh* mesh = defaultMeshPtr.release();-->
     ```cpp
     // on vertices
-    VertexData<double> myVertexScalar(mesh);
+    VertexData<double> myVertexScalar(*mesh);
     myVertexScalar[11] = 42.;
-    double val = myVertexScalar[11];
+    double val1 = myVertexScalar[11];
 
     // equivalent to:
-    double val = myVertexScalar[mesh->vertex(11)];
+    double val2 = myVertexScalar[mesh->vertex(11)];
 
     ```
     
@@ -147,13 +150,13 @@ The corresponding vectors are indexed according to the indices of the underlying
 
     Example usage:
     ```cpp
-    HalfedgeMesh meshA = /* something */;
-    HalfedgeMesh meshB = meshA.copy();
+    HalfedgeMesh& meshA = /* something */;
+    std::unique_ptr<HalfedgeMesh> meshB = meshA.copy();
 
     FaceData<Vector3> myDataOnA(meshA);
     /* fill myDataOnA with interesting values */
 
-    FaceData<Vector3> myDataOnB = myDataOnA.reinterpretTo(meshB);
+    FaceData<Vector3> myDataOnB = myDataOnA.reinterpretTo(*meshB);
     ```
 
 

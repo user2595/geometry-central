@@ -19,15 +19,15 @@ The separate type `BoundaryLoop` is used to represent boundary loops, and offers
 Since boundary loops act like faces in the mesh connectivity, traversing the mesh might yield a "face" referring to what is really a boundary loop. In particular, calling `Halfedge::face()` on an exterior halfedge will yield the "face" which is its boundary loop.  However, this "face" is a lie, we have not really _added_ a face to the mesh: `HalfedgeMesh::nFaces()` will still report the actual number of faces, etc.  The only valid thing to do with a `Face` which actually a boundary loop is to immediately convert it to a `BoundaryLoop`, See the example below.
 
 ```cpp
-Halfedge myHe = /* some exterior halfedge */;
-assert(myHe.isInterior() == false); // this is an exterior halfedge
+Halfedge myExteriorHalfedge = /* some exterior halfedge */;
+assert(myExteriorHalfedge.isInterior() == false); // this is an exterior halfedge
 
 // Traverse to "face"
-Face bFace = myExteriorHalfedge.face()
+Face bFace = myExteriorHalfedge.face();
 
 // bFace is really a boundary loop, doing any face things 
 // with it would be invalid
-assert(bFace.isBoundaryLoop() == true)
+assert(bFace.isBoundaryLoop() == true);
 
 // Convert the "face" to its true boundary loop form 
 BoundaryLoop bLoop = bFace.asBoundaryLoop();

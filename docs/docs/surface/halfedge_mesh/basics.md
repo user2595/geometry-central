@@ -21,6 +21,7 @@ Each vertex, edge, and face need just one relationship:
 - `Face::halfedge()` _any_ of the incident halfedges
 
 In fact, this fixed set of relationships is sufficient to implement pretty much _any_ local traversal. Geometry central provides a wide range of convience iterators which wrap these relationships to traverse neighborhoods, such as the example below.
+<!--- Vertex vertex = defaultMeshPtr->vertex(0);-->
 ```cpp
 for(Edge e : vertex.adjacentEdges()) {
   // do science
