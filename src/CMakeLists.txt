@@ -105,6 +105,11 @@ SET(HEADERS
   ${INCLUDE_ROOT}/surface/vertex_position_geometry.h
   ${INCLUDE_ROOT}/surface/vertex_position_geometry.ipp
 
+  ${INCLUDE_ROOT}/combinatorial-maps/combinatorial_map.h
+  ${INCLUDE_ROOT}/combinatorial-maps/combinatorial_map.ipp
+  ${INCLUDE_ROOT}/combinatorial-maps/combinatorial_map_element_types.h
+  ${INCLUDE_ROOT}/combinatorial-maps/combinatorial_map_element_types.ipp
+
   ${INCLUDE_ROOT}/utilities/combining_hash_functions.h
   ${INCLUDE_ROOT}/utilities/curve.h
   ${INCLUDE_ROOT}/utilities/curve.ipp
