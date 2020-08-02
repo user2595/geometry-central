@@ -66,7 +66,7 @@ public:
   // Properties
   bool isBoundary() const;
   bool isManifold() const;
-  bool isManifoldAndOriented() const; 
+  bool isManifoldAndOriented() const;
   size_t degree() const;
   size_t faceDegree() const;
 
@@ -206,6 +206,8 @@ public:
   Halfedge halfedge() const;
   Vertex otherVertex(Vertex v) const;
   bool isDead() const;
+  Vertex src() const;
+  Vertex dst() const;
 
   // Properties
   bool isBoundary() const;
@@ -589,4 +591,3 @@ template<> inline std::string typeShortName<surface::BoundaryLoop >();
 // clang-format on
 
 } // namespace geometrycentral
-

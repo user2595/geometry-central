@@ -296,6 +296,8 @@ inline Vertex Edge::otherVertex(Vertex v) const {
   }
 }
 inline bool Edge::isDead() const    { return mesh->edgeIsDead(ind); }
+inline Edge::Edge(HalfedgeMesh* mesh_, size_t ind_) : Element(mesh_,ind_) {}
+inline Edge::Edge(const DynamicElement<Edge>& e) : Element(e.getMesh(), e.getIndex()) {}
 
 // Properties
 inline bool Edge::isBoundary() const { 
@@ -486,4 +488,3 @@ inline Edge BoundaryLoopAdjacentEdgeNavigator::getCurrent() const { return currE
 
 } // namespace surface
 } // namespace geometrycentral
-
