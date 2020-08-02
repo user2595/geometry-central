@@ -2,7 +2,7 @@
 
 // The MeshIO class provides a variety of methods for mesh input/output.
 
-#include "geometrycentral/surface/manifold_surface_mesh.h"
+#include "geometrycentral/surface/polygon_soup_mesh.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
 
 #include <fstream>
@@ -11,8 +11,8 @@
 namespace geometrycentral {
 namespace surface {
 
-// strip unused vertices from face-vertex lists. Returns the mapping from old vertices to new vertices
-std::vector<size_t> stripUnusedVertices(std::vector<Vector3>& positions, std::vector<std::vector<size_t>>& faceIndices);
+// strip unused vertices from face-vertex lists
+void stripUnusedVertices(std::vector<Vector3>& positions, std::vector<std::vector<size_t>>& faceIndices);
 
 // Loads a halfedge mesh and its geometry from file.
 // Specify a type like "ply" or "obj", if no type is specified, attempts to infer from extension.
@@ -52,15 +52,19 @@ CornerData<Vector2> packToParam(SurfaceMesh& mesh, VertexData<double>& valsX, Ve
 class WavefrontOBJ {
 public:
   static bool write(std::string filename, const PolygonSoupMesh& soup);
+  static bool write(std::string filename, const PolygonSoupMesh& soup, const std::vector<Vector2>& texcoords);
   static bool write(std::string filename, EmbeddedGeometryInterface& geometry);
   static bool write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector2>& texcoords);
+  static bool write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector3>& normals);
 
 protected:
   static bool openStream(std::ofstream& out, std::string filename);
   static void writeHeader(std::ofstream& out, EmbeddedGeometryInterface& geometry);
   static void writeVertices(std::ofstream& out, EmbeddedGeometryInterface& geometry);
   static void writeTexCoords(std::ofstream& out, EmbeddedGeometryInterface& geometry, CornerData<Vector2>& texcoords);
-  static void writeFaces(std::ofstream& out, EmbeddedGeometryInterface& geometry, bool useTexCoords = false);
+  static void writeNormals(std::ofstream& out, EmbeddedGeometryInterface& geometry, CornerData<Vector3>& normals);
+  static void writeFaces(std::ofstream& out, EmbeddedGeometryInterface& geometry, bool useTexCoords = false,
+                         bool useNormals = false);
 };
 
 

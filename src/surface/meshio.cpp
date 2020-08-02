@@ -181,7 +181,79 @@ bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geomet
   return true;
 }
 
-bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector3>& normals) {
+// ======= Output =======
+bool WavefrontOBJ::write(std::string filename, const PolygonSoupMesh& soup) {
+  std::ofstream out;
+  if (!openStream(out, filename)) return false;
+
+  // TODO: count edges in polygon soup
+  out << "# Mesh exported from GeometryCentral" << endl;
+  out << "#  vertices: " << soup.vertexCoordinates.size() << endl;
+  out << "#     edges: "
+      << "NOT IMPLEMENTED YET" << endl;
+  out << "#     faces: " << soup.polygons.size() << endl;
+
+  out << "# texture coordinates: NO" << endl;
+  out << "# normals: NO" << endl;
+  cout << endl;
+
+  for (Vector3 v : soup.vertexCoordinates) {
+    out << "v " << v.x << " " << v.y << " " << v.z << endl;
+  }
+
+  for (std::vector<size_t> f : soup.polygons) {
+    out << "f";
+    for (size_t iV : f) {
+      out << " " << std::to_string(iV + 1) << "//";
+    }
+    out << endl;
+  }
+
+  return true;
+}
+
+bool WavefrontOBJ::write(std::string filename, const PolygonSoupMesh& soup, const std::vector<Vector2>& texcoords) {
+  std::ofstream out;
+  if (!openStream(out, filename)) return false;
+
+  // TODO: count edges in polygon soup
+  out << "# Mesh exported from GeometryCentral" << endl;
+  out << "#  vertices: " << soup.vertexCoordinates.size() << endl;
+  out << "#     edges: "
+      << "NOT IMPLEMENTED YET" << endl;
+  out << "#     faces: " << soup.polygons.size() << endl;
+
+  out << "# texture coordinates: YES" << endl;
+  out << "# normals: NO" << endl;
+  cout << endl;
+
+  for (Vector3 v : soup.vertexCoordinates) {
+    out << "v " << v.x << " " << v.y << " " << v.z << endl;
+  }
+  out << endl;
+
+  for (Vector2 vt : texcoords) {
+    out << "vt " << vt.x << " " << vt.y << endl;
+  }
+  out << endl;
+
+  size_t iC = 1;
+  for (std::vector<size_t> f : soup.polygons) {
+    out << "f";
+    for (size_t iV : f) {
+      out << " " << std::to_string(iV + 1) << "/" << std::to_string(iC++);
+    }
+    out << endl;
+  }
+  if (iC != texcoords.size() + 1) {
+    cout << "Save error: wrote " << iC - 1 << " texture coords, but texcoords.size() = " << texcoords.size() << endl;
+  }
+
+  return true;
+}
+
+
+bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry) {
   std::ofstream out;
   if (!openStream(out, filename)) return false;
 
@@ -215,6 +287,24 @@ bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geomet
   writeNormals(out, geometry, normals);
 
   bool useTexCoords = true;
+  bool useNormals = true;
+  writeFaces(out, geometry, useTexCoords, useNormals);
+
+  return true;
+}
+
+bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector3>& normals) {
+  std::ofstream out;
+  if (!openStream(out, filename)) return false;
+
+  writeHeader(out, geometry);
+  out << "# normals: YES" << endl;
+  cout << endl;
+
+  writeVertices(out, geometry);
+  writeNormals(out, geometry, normals);
+
+  bool useTexCoords = false;
   bool useNormals = true;
   writeFaces(out, geometry, useTexCoords, useNormals);
 
@@ -263,8 +353,18 @@ void WavefrontOBJ::writeTexCoords(std::ofstream& out, EmbeddedGeometryInterface&
   }
 }
 
-void WavefrontOBJ::writeFaces(std::ofstream& out, EmbeddedGeometryInterface& geometry, bool useTexCoords) {
-  SurfaceMesh& mesh(geometry.mesh);
+void WavefrontOBJ::writeNormals(std::ofstream& out, EmbeddedGeometryInterface& geometry, CornerData<Vector3>& normals) {
+  HalfedgeMesh& mesh(geometry.mesh);
+
+  for (Corner c : mesh.corners()) {
+    Vector3 n = normals[c];
+    out << "vn " << n.x << " " << n.y << " " << n.z << endl;
+  }
+}
+
+void WavefrontOBJ::writeFaces(std::ofstream& out, EmbeddedGeometryInterface& geometry, bool useTexCoords,
+                              bool useNormals) {
+  HalfedgeMesh& mesh(geometry.mesh);
 
   // Get vertex indices
   VertexData<size_t> indices = mesh.getVertexIndices();
@@ -272,7 +372,8 @@ void WavefrontOBJ::writeFaces(std::ofstream& out, EmbeddedGeometryInterface& geo
 
   auto indexFn = [&](Corner c) {
     std::string texCoordString = (useTexCoords) ? std::to_string(cIndices[c] + 1) : "";
-    return " " + std::to_string(indices[c.vertex()] + 1) + "/" + texCoordString;
+    std::string normalString = (useNormals) ? std::to_string(cIndices[c] + 1) : "";
+    return " " + std::to_string(indices[c.vertex()] + 1) + "/" + texCoordString + "/" + normalString;
   };
 
   for (Face f : mesh.faces()) {
