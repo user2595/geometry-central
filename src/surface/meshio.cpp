@@ -26,8 +26,6 @@ void processLoadedMesh(SimplePolygonMesh& mesh, std::string type) {
   if (type == "stl") {
     mesh.mergeIdenticalVertices();
   }
-
-  return oldToNewVertexInd;
 }
 
 
@@ -252,26 +250,6 @@ bool WavefrontOBJ::write(std::string filename, const PolygonSoupMesh& soup, cons
   return true;
 }
 
-
-bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry) {
-  std::ofstream out;
-  if (!openStream(out, filename)) return false;
-
-  writeHeader(out, geometry);
-  out << "# texture coordinates: NO" << endl;
-  out << "# normals: YES" << endl;
-  cout << endl;
-
-  writeVertices(out, geometry);
-  writeNormals(out, geometry, normals);
-
-  bool useTexCoords = false;
-  bool useNormals = true;
-  writeFaces(out, geometry, useTexCoords, useNormals);
-
-  return true;
-}
-
 bool WavefrontOBJ::write(std::string filename, EmbeddedGeometryInterface& geometry, CornerData<Vector2>& texcoords,
                          CornerData<Vector3>& normals) {
   std::ofstream out;
@@ -354,7 +332,7 @@ void WavefrontOBJ::writeTexCoords(std::ofstream& out, EmbeddedGeometryInterface&
 }
 
 void WavefrontOBJ::writeNormals(std::ofstream& out, EmbeddedGeometryInterface& geometry, CornerData<Vector3>& normals) {
-  HalfedgeMesh& mesh(geometry.mesh);
+  SurfaceMesh& mesh(geometry.mesh);
 
   for (Corner c : mesh.corners()) {
     Vector3 n = normals[c];
@@ -364,7 +342,7 @@ void WavefrontOBJ::writeNormals(std::ofstream& out, EmbeddedGeometryInterface& g
 
 void WavefrontOBJ::writeFaces(std::ofstream& out, EmbeddedGeometryInterface& geometry, bool useTexCoords,
                               bool useNormals) {
-  HalfedgeMesh& mesh(geometry.mesh);
+  SurfaceMesh& mesh(geometry.mesh);
 
   // Get vertex indices
   VertexData<size_t> indices = mesh.getVertexIndices();
