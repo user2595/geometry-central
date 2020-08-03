@@ -518,7 +518,7 @@ std::unique_ptr<ManifoldSurfaceMesh> SurfaceMesh::toManifoldMesh() {
       i++;
     }
   }
-  
+
   // Build twin array
   std::vector<std::vector<std::tuple<size_t, size_t>>> twins(nFaces());
   for (Face f : faces()) {
@@ -1685,8 +1685,8 @@ void SurfaceMesh::compressHalfedges() {
   heNextArr = applyPermutation(heNextArr, newIndMap);
   heVertexArr = applyPermutation(heVertexArr, newIndMap);
   heFaceArr = applyPermutation(heFaceArr, newIndMap);
-  heSiblingArr = applyPermutation(heSiblingArr, newIndMap);
   if (!usesImplicitTwin()) {
+    heSiblingArr = applyPermutation(heSiblingArr, newIndMap);
     heEdgeArr = applyPermutation(heEdgeArr, newIndMap);
     heOrientArr = applyPermutation(heOrientArr, newIndMap);
     heVertInNextArr = applyPermutation(heVertInNextArr, newIndMap);
@@ -1726,6 +1726,7 @@ void SurfaceMesh::compressEdges() {
   // Build the compressing shift
   std::vector<size_t> newIndMap;                               // maps new ind -> old ind
   std::vector<size_t> oldIndMap(nEdgesFillCount, INVALID_IND); // maps old ind -> new ind
+
   for (size_t i = 0; i < nEdgesFillCount; i++) {
     if (!edgeIsDead(i)) {
       oldIndMap[i] = newIndMap.size();
@@ -1825,10 +1826,10 @@ void SurfaceMesh::compress() {
     return;
   }
 
-  compressHalfedges();
   compressEdges();
   compressFaces();
   compressVertices();
+  compressHalfedges();
   isCompressedFlag = true;
 }
 
