@@ -1069,10 +1069,17 @@ Vertex ManifoldSurfaceMesh::collapseEdge(Edge e) {
     return Vertex();
   }
 
+  // Refuse to do a collapse if heA1TNext == heB2T.
+  // TODO: it should be possible to fix the logic to allow this case, but right now it's simpler to complain
+  if (heA1TNext == heB2T) {
+    return Vertex();
+  }
+
   // Should be exactly two vertices, the opposite diamond vertices, in the intersection of the 1-rings.
   // Checking this property ensures that triangulations stays a simplicial complex (no new self-edges, etc).
 
 
+  /*
   std::cerr << "ABOUT TO ENTER LOOP. 4597.next() = " << heNextArr[4597] << std::endl;
   std::cerr << "\tvHalfedgeArr.size() = " << vHalfedgeArr.size() << std::endl;
   std::cerr << "\theNextArr.size() = " << heNextArr.size() << std::endl;
@@ -1089,6 +1096,7 @@ Vertex ManifoldSurfaceMesh::collapseEdge(Edge e) {
   } while (curr != he && iter++ < 20);
   std::cerr << "\t\tEND LOOP" << std::endl;
   if (curr != he) exit(1);
+  */
 
   std::unordered_set<Vertex> vANeighbors;
   for (Vertex vN : vA.adjacentVertices()) {
@@ -1117,9 +1125,9 @@ Vertex ManifoldSurfaceMesh::collapseEdge(Edge e) {
   // == Around face A
   {
     heNextArr[heA1TPrev.getIndex()] = heA2.getIndex();
-    std::cerr << "set heNextArr[" << heA1TPrev.getIndex() << "] to " << heNextArr[heA1TPrev.getIndex()] << std::endl;
+    // std::cerr << "set heNextArr[" << heA1TPrev.getIndex() << "] to " << heNextArr[heA1TPrev.getIndex()] << std::endl;
     heNextArr[heA2.getIndex()] = heA1TNext.getIndex();
-    std::cerr << "set heNextArr[" << heA2.getIndex() << "] to " << heNextArr[heA2.getIndex()] << std::endl;
+    // std::cerr << "set heNextArr[" << heA2.getIndex() << "] to " << heNextArr[heA2.getIndex()] << std::endl;
     heVertexArr[heA2T.getIndex()] = vA.getIndex();
     heFaceArr[heA2.getIndex()] = heFaceArr[heA1T.getIndex()];
 
@@ -1149,9 +1157,9 @@ Vertex ManifoldSurfaceMesh::collapseEdge(Edge e) {
 
     // Handle halfedge connections around heB2
     heNextArr[heB2TPrev.getIndex()] = heB1.getIndex();
-    std::cerr << "set heNextArr[" << heB2TPrev.getIndex() << "] to " << heNextArr[heB2TPrev.getIndex()] << std::endl;
+    // std::cerr << "set heNextArr[" << heB2TPrev.getIndex() << "] to " << heNextArr[heB2TPrev.getIndex()] << std::endl;
     heNextArr[heB1.getIndex()] = heB2TNext.getIndex();
-    std::cerr << "set heNextArr[" << heB1.getIndex() << "] to " << heNextArr[heB1.getIndex()] << std::endl;
+    // std::cerr << "set heNextArr[" << heB1.getIndex() << "] to " << heNextArr[heB1.getIndex()] << std::endl;
     heVertexArr[heB1.getIndex()] = vA.getIndex();
     heFaceArr[heB1.getIndex()] = heFaceArr[heB2T.getIndex()];
 
@@ -1181,11 +1189,11 @@ Vertex ManifoldSurfaceMesh::collapseEdge(Edge e) {
     ensureVertexHasBoundaryHalfedge(vA);
   }
 
-  std::cerr << "int the middle... 4597.next() = " << heNextArr[4597] << std::endl;
+  // std::cerr << "int the middle... 4597.next() = " << heNextArr[4597] << std::endl;
   // === Delete the actual elements
 
-  std::cerr << "Deleting halfedges  " << heA0.getIndex() << ", " << heA0.twin().getIndex() << std::endl;
-  std::cerr << "Deleting halfedges  " << heA1.getIndex() << ", " << heA1.twin().getIndex() << std::endl;
+  // std::cerr << "Deleting halfedges  " << heA0.getIndex() << ", " << heA0.twin().getIndex() << std::endl;
+  // std::cerr << "Deleting halfedges  " << heA1.getIndex() << ", " << heA1.twin().getIndex() << std::endl;
   deleteEdgeBundle(heA0.edge());
   deleteEdgeBundle(heA1.edge());
   deleteElement(vB);
@@ -1193,14 +1201,14 @@ Vertex ManifoldSurfaceMesh::collapseEdge(Edge e) {
   if (!onBoundary) {
     deleteElement(fB);
     deleteEdgeBundle(heB2.edge());
-    std::cerr << "Deleting halfedges  " << heB2.getIndex() << ", " << heB2.twin().getIndex() << std::endl;
+    // std::cerr << "Deleting halfedges  " << heB2.getIndex() << ", " << heB2.twin().getIndex() << std::endl;
   }
 
 
   modificationTick++;
-  std::cerr << "RETURNING... 4597.next() = " << heNextArr[4597] << std::endl << std::flush;
-  std::cerr << "RETURNED VERTEX " << vA.getIndex() << " and vHalfedgeArr.size() is " << vHalfedgeArr.size()
-            << std::endl;
+  // std::cerr << "RETURNING... 4597.next() = " << heNextArr[4597] << std::endl << std::flush;
+  // std::cerr << "RETURNED VERTEX " << vA.getIndex() << " and vHalfedgeArr.size() is " << vHalfedgeArr.size()
+  //           << std::endl;
   return vA;
 }
 
