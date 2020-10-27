@@ -1050,6 +1050,7 @@ Vertex ManifoldSurfaceMesh::collapseEdge(Edge e) {
   Face fB = heB0.face();
   Vertex vB = heB0.vertex();
   GC_SAFETY_ASSERT(heB2.next() == heB0 || onBoundary, "face must be triangular or on boundary to collapse")
+  Halfedge heB1T = heB1.twin();
   Halfedge heB2T = heB2.twin();
   Halfedge heB2TNext = heB2T.next();
   Halfedge heB2TPrev = heB2T.prevOrbitFace();
@@ -1070,12 +1071,31 @@ Vertex ManifoldSurfaceMesh::collapseEdge(Edge e) {
 
   // Should be exactly two vertices, the opposite diamond vertices, in the intersection of the 1-rings.
   // Checking this property ensures that triangulations stays a simplicial complex (no new self-edges, etc).
+
+
+  std::cerr << "ABOUT TO ENTER LOOP. 4597.next() = " << heNextArr[4597] << std::endl;
+  std::cerr << "\tvHalfedgeArr.size() = " << vHalfedgeArr.size() << std::endl;
+  std::cerr << "\theNextArr.size() = " << heNextArr.size() << std::endl;
+  Halfedge he = vA.halfedge();
+  Halfedge curr = he;
+  std::cerr << "\t\tBEGIN LOOP" << std::endl;
+  size_t iter = 0;
+  do {
+    std::cerr << "\t\t\tConsidering halfedge " << curr.getIndex() << "\t with twin " << curr.twin().getIndex()
+              << "\tnext: " << curr.next().getIndex() << "\t and twin.next: " << curr.twin().next().getIndex()
+              << std::endl;
+
+    curr = curr.twin().next();
+  } while (curr != he && iter++ < 20);
+  std::cerr << "\t\tEND LOOP" << std::endl;
+  if (curr != he) exit(1);
+
   std::unordered_set<Vertex> vANeighbors;
-  for (Vertex vN : Vertex(vA).adjacentVertices()) {
+  for (Vertex vN : vA.adjacentVertices()) {
     vANeighbors.insert(vN);
   }
   size_t nShared = 0;
-  for (Vertex vN : Vertex(vB).adjacentVertices()) {
+  for (Vertex vN : vB.adjacentVertices()) {
     if (vANeighbors.find(vN) != vANeighbors.end()) {
       nShared++;
     }
@@ -1097,7 +1117,9 @@ Vertex ManifoldSurfaceMesh::collapseEdge(Edge e) {
   // == Around face A
   {
     heNextArr[heA1TPrev.getIndex()] = heA2.getIndex();
+    std::cerr << "set heNextArr[" << heA1TPrev.getIndex() << "] to " << heNextArr[heA1TPrev.getIndex()] << std::endl;
     heNextArr[heA2.getIndex()] = heA1TNext.getIndex();
+    std::cerr << "set heNextArr[" << heA2.getIndex() << "] to " << heNextArr[heA2.getIndex()] << std::endl;
     heVertexArr[heA2T.getIndex()] = vA.getIndex();
     heFaceArr[heA2.getIndex()] = heFaceArr[heA1T.getIndex()];
 
@@ -1127,15 +1149,17 @@ Vertex ManifoldSurfaceMesh::collapseEdge(Edge e) {
 
     // Handle halfedge connections around heB2
     heNextArr[heB2TPrev.getIndex()] = heB1.getIndex();
+    std::cerr << "set heNextArr[" << heB2TPrev.getIndex() << "] to " << heNextArr[heB2TPrev.getIndex()] << std::endl;
     heNextArr[heB1.getIndex()] = heB2TNext.getIndex();
+    std::cerr << "set heNextArr[" << heB1.getIndex() << "] to " << heNextArr[heB1.getIndex()] << std::endl;
     heVertexArr[heB1.getIndex()] = vA.getIndex();
     heFaceArr[heB1.getIndex()] = heFaceArr[heB2T.getIndex()];
 
     // Vertex connections
-    // Don't need to update this vertex, since heB2T.vertex() is about to be deleted
-    // if (heB2T.vertex().halfedge() == heB2T) {
-    //   vHalfedgeArr[heB2T.vertex().getIndex()] = heB1.getIndex();
-    // }
+    // Don't need to update vB vertex, since vB is about to be deleted
+    if (heB2.vertex().halfedge() == heB2) {
+      vHalfedgeArr[heB2.vertex().getIndex()] = heB1T.getIndex();
+    }
 
     // Face connections
     if (heB2T.face().halfedge() == heB2T) {
@@ -1157,8 +1181,11 @@ Vertex ManifoldSurfaceMesh::collapseEdge(Edge e) {
     ensureVertexHasBoundaryHalfedge(vA);
   }
 
+  std::cerr << "int the middle... 4597.next() = " << heNextArr[4597] << std::endl;
   // === Delete the actual elements
 
+  std::cerr << "Deleting halfedges  " << heA0.getIndex() << ", " << heA0.twin().getIndex() << std::endl;
+  std::cerr << "Deleting halfedges  " << heA1.getIndex() << ", " << heA1.twin().getIndex() << std::endl;
   deleteEdgeBundle(heA0.edge());
   deleteEdgeBundle(heA1.edge());
   deleteElement(vB);
@@ -1166,10 +1193,14 @@ Vertex ManifoldSurfaceMesh::collapseEdge(Edge e) {
   if (!onBoundary) {
     deleteElement(fB);
     deleteEdgeBundle(heB2.edge());
+    std::cerr << "Deleting halfedges  " << heB2.getIndex() << ", " << heB2.twin().getIndex() << std::endl;
   }
 
 
   modificationTick++;
+  std::cerr << "RETURNING... 4597.next() = " << heNextArr[4597] << std::endl << std::flush;
+  std::cerr << "RETURNED VERTEX " << vA.getIndex() << " and vHalfedgeArr.size() is " << vHalfedgeArr.size()
+            << std::endl;
   return vA;
 }
 
