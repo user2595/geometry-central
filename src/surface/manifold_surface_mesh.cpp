@@ -1207,6 +1207,7 @@ Vertex ManifoldSurfaceMesh::collapseEdge(Edge e) {
 
   modificationTick++;
   // std::cerr << "RETURNING... 4597.next() = " << heNextArr[4597] << std::endl << std::flush;
+  // std::cerr << "RETURNING... 79740.vertex() = " << heVertexArr[79740] << std::endl << std::flush;
   // std::cerr << "RETURNED VERTEX " << vA.getIndex() << " and vHalfedgeArr.size() is " << vHalfedgeArr.size()
   //           << std::endl;
   return vA;
@@ -1701,7 +1702,7 @@ std::vector<Face> ManifoldSurfaceMesh::triangulate(Face f) {
   Halfedge connectHe = f.halfedge();
   for (size_t i = 2; i + 1 < neighHalfedges.size(); i++) {
     connectHe = connectVertices(connectHe, neighHalfedges[i]);
-    allFaces.emplace_back(neighHalfedges[i].face());
+    allFaces.emplace_back(connectHe.twin().face());
   }
 
   modificationTick++;
