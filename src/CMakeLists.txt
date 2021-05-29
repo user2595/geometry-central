@@ -11,6 +11,7 @@ SET(SRCS
   surface/surface_mesh.cpp
   surface/manifold_surface_mesh.cpp
   surface/halfedge_factories.cpp
+  surface/surface_mesh_factories.cpp
   surface/meshio.cpp
   surface/simple_polygon_mesh.cpp
   surface/rich_surface_mesh_data.cpp
@@ -76,6 +77,7 @@ SET(HEADERS
   ${INCLUDE_ROOT}/surface/halfedge_element_types.h
   ${INCLUDE_ROOT}/surface/halfedge_element_types.ipp
   ${INCLUDE_ROOT}/surface/halfedge_factories.h
+  ${INCLUDE_ROOT}/surface/surface_mesh_factories.h
   ${INCLUDE_ROOT}/surface/halfedge_logic_templates.ipp
   ${INCLUDE_ROOT}/surface/halfedge_mesh.h
   ${INCLUDE_ROOT}/surface/heat_method_distance.h

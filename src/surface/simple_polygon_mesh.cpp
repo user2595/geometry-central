@@ -573,9 +573,10 @@ void SimplePolygonMesh::writeMesh(std::string filename, std::string type) {
 void SimplePolygonMesh::writeMesh(std::ostream& out, std::string type) {
   if (type == "obj") {
     return writeMeshObj(out);
-  } else {
-    throw std::runtime_error("Write mesh file type " + type + " not supported");
+  } else if (type == "ply") {
+    return writeMeshPLY(out);
   }
+  throw std::runtime_error("Write mesh file type " + type + " not supported");
 }
 
 void SimplePolygonMesh::writeMeshObj(std::ostream& out) {
@@ -615,6 +616,18 @@ void SimplePolygonMesh::writeMeshObj(std::ostream& out) {
     out << std::endl;
   }
 }
+
+void SimplePolygonMesh::writeMeshPLY(std::ostream& out) {
+  happly::PLYData plyMesh;
+  std::vector<std::array<double, 3>> vertexPositions;
+  for (Vector3 p : vertexCoordinates) {
+    vertexPositions.push_back({p.x, p.y, p.z});
+  }
+  plyMesh.addVertexPositions(vertexPositions);
+  plyMesh.addFaceIndices(polygons);
+  plyMesh.write(out, happly::DataFormat::Binary);
+}
+
 
 std::unique_ptr<SimplePolygonMesh> unionMeshes(const std::vector<SimplePolygonMesh>& meshes) {
 

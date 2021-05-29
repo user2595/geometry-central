@@ -77,6 +77,7 @@ private:
 
   // Write helpers
   void writeMeshObj(std::ostream& out);
+  void writeMeshPLY(std::ostream& out);
 };
 
 std::unique_ptr<SimplePolygonMesh> unionMeshes(const std::vector<SimplePolygonMesh>& meshes);

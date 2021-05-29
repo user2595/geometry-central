@@ -3,6 +3,7 @@
 #include "geometrycentral/surface/halfedge_factories.h"
 #include "geometrycentral/surface/manifold_surface_mesh.h"
 #include "geometrycentral/surface/simple_polygon_mesh.h"
+#include "geometrycentral/surface/surface_mesh_factories.h"
 
 #include "happly.h"
 
@@ -96,6 +97,33 @@ readManifoldSurfaceMesh(std::istream& in, std::string type) {
   simpleMesh.readMeshFromFile(in, type);
   processLoadedMesh(simpleMesh, loadType);
   return makeHalfedgeAndGeometry(simpleMesh.polygons, simpleMesh.vertexCoordinates);
+}
+
+// Load a mesh with UV coordinates, which will be stored as data at triangle
+// corners (to allow for UVs that are discontinuous across edges, e.g., at cuts)
+std::tuple<std::unique_ptr<ManifoldSurfaceMesh>, std::unique_ptr<VertexPositionGeometry>,
+           std::unique_ptr<CornerData<Vector2>>>
+readParameterizedManifoldSurfaceMesh(std::string filename, std::string type) {
+  std::string loadType;
+  SimplePolygonMesh simpleMesh;
+  simpleMesh.readMeshFromFile(filename, type, loadType);
+  processLoadedMesh(simpleMesh, loadType);
+
+  return makeParameterizedManifoldSurfaceMeshAndGeometry(simpleMesh.polygons, simpleMesh.vertexCoordinates,
+                                                         simpleMesh.paramCoordinates);
+}
+
+// Load a mesh with UV coordinates, which will be stored as data at triangle
+// corners (to allow for UVs that are discontinuous across edges, e.g., at cuts)
+std::tuple<std::unique_ptr<SurfaceMesh>, std::unique_ptr<VertexPositionGeometry>, std::unique_ptr<CornerData<Vector2>>>
+readParameterizedSurfaceMesh(std::string filename, std::string type) {
+  std::string loadType;
+  SimplePolygonMesh simpleMesh;
+  simpleMesh.readMeshFromFile(filename, type, loadType);
+  processLoadedMesh(simpleMesh, loadType);
+
+  return makeParameterizedSurfaceMeshAndGeometry(simpleMesh.polygons, simpleMesh.vertexCoordinates,
+                                                 simpleMesh.paramCoordinates);
 }
 
 

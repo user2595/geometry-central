@@ -224,9 +224,16 @@ ManifoldSurfaceMesh::ManifoldSurfaceMesh(const std::vector<std::vector<size_t>>&
       size_t firstHe = currHe;
       do {
 
+        if (!!halfedgeSeen[currHe]) {
+          std::cerr << "Error at vertex " << iV << std::endl;
+        }
         GC_SAFETY_ASSERT(!halfedgeSeen[currHe], "somehow encountered outgoing halfedge before orbiting v");
         halfedgeSeen[currHe] = true;
 
+        if (heTwinImplicit(currHe) >= heNextArr.size()) {
+          std::cerr << "Error(2) at vertex " << iV << std::endl;
+          GC_SAFETY_ASSERT(false, "bad twin");
+        }
         currHe = heNextArr[heTwinImplicit(currHe)];
       } while (currHe != firstHe);
     }
