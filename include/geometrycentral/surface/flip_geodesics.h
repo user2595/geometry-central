@@ -61,6 +61,8 @@ public:
   // Helpers to access the path in a more convenient format
   size_t size();
   std::vector<Halfedge> getHalfedgeList();
+
+  void removeFromNetwork(); // WARNING: Removes segments, but *does not* remove path from paths list
 };
 
 
@@ -125,7 +127,9 @@ public:
   // add a path to an existing network
   // input should be a vector of INTRINSIC halfedges
   // TODO fornow, does not contain any logic to "layer" path on top of other existing paths; must be unobstructed
-  void addPath(const std::vector<Halfedge>& path);
+  FlipEdgePath* addPath(const std::vector<Halfedge>& path);
+
+  bool removePath(FlipEdgePath* path);
 
   // === Properties
 
@@ -141,6 +145,7 @@ public:
   FlipPathSegment getOutsideSegment(Halfedge he);
   void popOutsideSegment(Halfedge he);
   void pushOutsideSegment(Halfedge he, FlipPathSegment p);
+  void popSegment(Halfedge he, SegmentID sID);
   FlipPathSegment getFirst(); // returns any if multiple
   FlipPathSegment getLast();  // returns any if multiple
   // HalfedgeData<int> pathCountAtHalfedge;
@@ -153,6 +158,7 @@ public:
   using WeightedAngle = std::tuple<double, SegmentAngleType, FlipPathSegment>;
   std::priority_queue<WeightedAngle, std::vector<WeightedAngle>, std::greater<WeightedAngle>> wedgeAngleQueue;
   void addToWedgeAngleQueue(const FlipPathSegment& pathSegmentNext);
+  void addPathWedgesToAngleQueue(FlipEdgePath* path);
   void addAllWedgesToAngleQueue();
 
   // Manage a unique set of IDs assigned to paths segments. The ordering of these IDs means nothing, and IDs are

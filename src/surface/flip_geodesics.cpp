@@ -75,6 +75,18 @@ FlipEdgePath::FlipEdgePath(FlipEdgeNetwork& network_, std::vector<Halfedge> half
   }
 }
 
+void FlipEdgePath::removeFromNetwork() {
+  for (auto it : pathHeInfo) {
+    // Gather values
+    SegmentID currID = it.first;
+    SegmentID prevID, nextID;
+    Halfedge currHe;
+    std::tie(currHe, prevID, nextID) = it.second;
+
+    if (currHe != Halfedge()) network.popSegment(currHe, currID);
+  }
+}
+
 
 void FlipEdgePath::replacePathSegment(SegmentID nextID, SegmentAngleType angleType,
                                       const std::vector<Halfedge>& newHalfedges) {
@@ -294,13 +306,25 @@ FlipEdgeNetwork::FlipEdgeNetwork(std::unique_ptr<SignpostIntrinsicTriangulation>
 std::unique_ptr<SignpostIntrinsicTriangulation> FlipEdgeNetwork::relinquishTriangulation() { return std::move(tri); }
 
 
-void FlipEdgeNetwork::addPath(const std::vector<Halfedge>& hePath) {
+FlipEdgePath* FlipEdgeNetwork::addPath(const std::vector<Halfedge>& hePath) {
   // Assumes that path is closed if it ends where it starts
   // (this might be a problem as the default one day, but for now it is overwhelmingly likely to be what we want
   Halfedge firstHe = hePath.front();
   Halfedge lastHe = hePath.back();
   bool isClosed = firstHe.vertex() == lastHe.twin().vertex();
   paths.emplace_back(new FlipEdgePath(*this, hePath, isClosed));
+  return paths[paths.size() - 1].get();
+}
+
+bool FlipEdgeNetwork::removePath(FlipEdgePath* path) {
+  for (size_t iP = 0; iP < paths.size(); iP++) {
+    if (path == paths[iP].get()) {
+      paths[iP]->removeFromNetwork();
+      paths.erase(paths.begin() + iP);
+      return true;
+    }
+  }
+  return false;
 }
 
 std::unique_ptr<FlipEdgeNetwork> FlipEdgeNetwork::constructFromDijkstraPath(ManifoldSurfaceMesh& mesh_,
@@ -651,6 +675,7 @@ bool FlipEdgeNetwork::wedgeIsClear(const FlipPathSegment& pathSegmentNext, Segme
   // Used to disable straightening around certain vertices, but usually this isn't what you want: the algorithm should
   // still be able to straighten if a path touches and endpoint vertex but is not obstructed.
   if (!straightenAroundMarkedVertices && isMarkedVertex[middleVert]) {
+    std::cout << "hooked on marked vertex" << std::endl;
     return false;
   }
 
@@ -664,13 +689,22 @@ bool FlipEdgeNetwork::wedgeIsClear(const FlipPathSegment& pathSegmentNext, Segme
   case SegmentAngleType::LeftTurn: {
 
     // Check bounding edges
-    if (getOutsideSegment(hePrev) != pathSegmentPrev) return false;
-    if (getOutsideSegment(heNext) != pathSegmentNext) return false;
+    if (getOutsideSegment(hePrev) != pathSegmentPrev) {
+      // std::cout << "AAA" << std::endl;
+      return false;
+    }
+    if (getOutsideSegment(heNext) != pathSegmentNext) {
+      // std::cout << "BBB" << std::endl;
+      return false;
+    }
 
     // Orbit incident edges in wedge, each must have no path edges
     Halfedge heCurr = hePrev.next();
     while (heCurr != heNext) {
-      if (edgeInPath(heCurr.edge())) return false;
+      if (edgeInPath(heCurr.edge())) {
+        // std::cout << "CCC " << heCurr.edge() << " is blocking " << std::endl;
+        return false;
+      }
       heCurr = heCurr.twin().next();
     }
     break;
@@ -678,13 +712,24 @@ bool FlipEdgeNetwork::wedgeIsClear(const FlipPathSegment& pathSegmentNext, Segme
   case SegmentAngleType::RightTurn: {
 
     // Check bounding edges
-    if (getOutsideSegment(hePrev.twin()) != pathSegmentPrev) return false;
-    if (getOutsideSegment(heNext.twin()) != pathSegmentNext) return false;
+    // if (getOutsideSegment(hePrev.twin()) != pathSegmentPrev) return false;
+    // if (getOutsideSegment(heNext.twin()) != pathSegmentNext) return false;
+    if (getOutsideSegment(hePrev.twin()) != pathSegmentPrev) {
+      // std::cout << "DDD" << std::endl;
+      return false;
+    }
+    if (getOutsideSegment(heNext.twin()) != pathSegmentNext) {
+      // std::cout << "EEE" << std::endl;
+      return false;
+    }
 
     // Orbit incident edges in wedge, each must have no path edges
     Halfedge heCurr = hePrev.twin().next().next().twin();
     while (heCurr != heNext) {
-      if (edgeInPath(heCurr.edge())) return false;
+      if (edgeInPath(heCurr.edge())) {
+        // std::cout << "FFF" << std::endl;
+        return false;
+      }
       heCurr = heCurr.next().next().twin();
     }
     break;
@@ -964,6 +1009,7 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
   size_t nIterations = 0;
 
   while (!wedgeAngleQueue.empty() && (maxIterations == INVALID_IND || nIterations < maxIterations)) {
+    // std::cout << "Checking wedge" << std::endl;
 
     // Get the smallest angle
     double minAngle = std::get<0>(wedgeAngleQueue.top());
@@ -985,6 +1031,7 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
     // TODO I think we _might_ be able to argue that this check isn't necessary, and the wedge will always be clear as
     // long as we check it before inserting in to the queue
     if (!wedgeIsClear(pathSegment, angleType)) {
+      // std::cout << "\twedge is not clear >:(" << std::endl;
       continue;
     }
 
@@ -1052,19 +1099,33 @@ void FlipEdgeNetwork::addToWedgeAngleQueue(const FlipPathSegment& pathSegment) {
 
 void FlipEdgeNetwork::addAllWedgesToAngleQueue() {
   for (auto& epPtr : paths) {
-    FlipEdgePath& path = *epPtr;
+    addPathWedgesToAngleQueue(epPtr.get());
+    // FlipEdgePath& path = *epPtr;
+    // for (auto it : path.pathHeInfo) {
 
-    for (auto it : path.pathHeInfo) {
+    //   // Gather values
+    //   SegmentID currID = it.first;
+    //   SegmentID prevID, nextID;
+    //   Halfedge currHe;
+    //   std::tie(currHe, prevID, nextID) = it.second;
 
-      // Gather values
-      SegmentID currID = it.first;
-      SegmentID prevID, nextID;
-      Halfedge currHe;
-      std::tie(currHe, prevID, nextID) = it.second;
+    //   if (prevID != INVALID_IND) {
+    //     addToWedgeAngleQueue(FlipPathSegment{epPtr.get(), currID});
+    //   }
+    // }
+  }
+}
 
-      if (prevID != INVALID_IND) {
-        addToWedgeAngleQueue(FlipPathSegment{epPtr.get(), currID});
-      }
+void FlipEdgeNetwork::addPathWedgesToAngleQueue(FlipEdgePath* path) {
+  for (auto it : path->pathHeInfo) {
+    // Gather values
+    SegmentID currID = it.first;
+    SegmentID prevID, nextID;
+    Halfedge currHe;
+    std::tie(currHe, prevID, nextID) = it.second;
+
+    if (prevID != INVALID_IND) {
+      addToWedgeAngleQueue(FlipPathSegment{path, currID});
     }
   }
 }
@@ -1384,6 +1445,17 @@ void FlipEdgeNetwork::pushOutsideSegment(Halfedge he, FlipPathSegment p) {
     pathsAtEdge[e].push_front(p);
   } else {
     pathsAtEdge[e].push_back(p);
+  }
+}
+
+void FlipEdgeNetwork::popSegment(Halfedge he, SegmentID sID) {
+  for (size_t iS = 0; iS < pathsAtEdge[he.edge()].size(); iS++) {
+    if (pathsAtEdge[he.edge()][iS].id == sID) {
+      pathsAtEdge[he.edge()].erase(pathsAtEdge[he.edge()].begin() + iS);
+      // std::cout << "popped segment on edge " << he.edge() << ". Now there are " << pathsAtEdge[he.edge()].size()
+      // << " segments remaining" << std::endl;
+      return;
+    }
   }
 }
 
