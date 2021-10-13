@@ -98,6 +98,12 @@ public:
                   const std::vector<std::vector<Halfedge>>& paths,
                   VertexData<bool> extraMarkedVerts = VertexData<bool>());
 
+  // Construct a network from a collection of paths on an existing intrinsic triangulation
+  FlipEdgeNetwork(std::unique_ptr<SignpostIntrinsicTriangulation> tri, const std::vector<std::vector<Halfedge>>& paths,
+                  VertexData<bool> extraMarkedVerts = VertexData<bool>());
+
+  std::unique_ptr<SignpostIntrinsicTriangulation> relinquishTriangulation();
+
   // === Static initializers
 
   // Run Dijkstra between endpoints to initialize path

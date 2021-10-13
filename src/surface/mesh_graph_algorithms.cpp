@@ -11,7 +11,8 @@
 namespace geometrycentral {
 namespace surface {
 
-std::vector<Halfedge> shortestEdgePath(IntrinsicGeometryInterface& geom, Vertex startVert, Vertex endVert) {
+std::vector<Halfedge> shortestEdgePath(IntrinsicGeometryInterface& geom, Vertex startVert, Vertex endVert,
+                                       std::vector<Edge> markedEdges) {
 
   // Early out for empty case
   if (startVert == endVert) {
@@ -29,12 +30,16 @@ std::vector<Halfedge> shortestEdgePath(IntrinsicGeometryInterface& geom, Vertex 
   using WeightedHalfedge = std::tuple<double, Halfedge>;
   std::priority_queue<WeightedHalfedge, std::vector<WeightedHalfedge>, std::greater<WeightedHalfedge>> pq;
 
+  EdgeData<bool> marked(mesh, false);
+  for (Edge e : markedEdges) marked[e] = true;
+
   // Helper to add a vertex's
   auto vertexDiscovered = [&](Vertex v) {
     return v == startVert || incomingHalfedge.find(v) != incomingHalfedge.end();
   };
   auto enqueueVertexNeighbors = [&](Vertex v, double dist) {
     for (Halfedge he : v.outgoingHalfedges()) {
+      if (marked[he.edge()]) continue;
       if (!vertexDiscovered(he.twin().vertex())) {
         double len = geom.edgeLengths[he.edge()];
         double targetDist = dist + len;

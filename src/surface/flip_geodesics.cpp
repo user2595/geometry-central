@@ -256,6 +256,43 @@ FlipEdgeNetwork::FlipEdgeNetwork(ManifoldSurfaceMesh& mesh_, IntrinsicGeometryIn
   validate();
 }
 
+// Construct a network from a collection of paths on an existing intrinsic triangulation
+FlipEdgeNetwork::FlipEdgeNetwork(std::unique_ptr<SignpostIntrinsicTriangulation> tri_,
+                                 const std::vector<std::vector<Halfedge>>& hePaths, VertexData<bool> extraMarkedVerts)
+    : tri(std::move(tri_)), mesh(*(tri->intrinsicMesh)), pathsAtEdge(mesh), isMarkedVertex(mesh, false) {
+  // Build initial paths from the vectors of edges (path constructor updates other structures of this class)
+  for (const std::vector<Halfedge>& hePath : hePaths) {
+    // Assumes that path is closed if it ends where it starts
+    // (this might be a problem as the default one day, but for now it is overwhelmingly likely to be what we want
+    Halfedge firstHe = hePath.front();
+    Halfedge lastHe = hePath.back();
+    bool isClosed = firstHe.vertex() == lastHe.twin().vertex();
+
+
+    // Convert to the corresponding intrinsic halfedges
+    std::vector<Halfedge> intPath(hePath.size());
+    for (size_t i = 0; i < hePath.size(); i++) {
+      intPath[i] = mesh.halfedge(hePath[i].getIndex());
+    }
+
+    paths.emplace_back(new FlipEdgePath(*this, intPath, isClosed));
+  }
+
+  // Mark any additional verts
+  if (extraMarkedVerts.size() > 0) {
+    for (Vertex v : mesh.vertices()) {
+      if (extraMarkedVerts[v.getIndex()]) {
+        isMarkedVertex[v] = true;
+      }
+    }
+  }
+
+  // Make sure everything is good to go
+  validate();
+}
+
+std::unique_ptr<SignpostIntrinsicTriangulation> FlipEdgeNetwork::relinquishTriangulation() { return std::move(tri); }
+
 
 void FlipEdgeNetwork::addPath(const std::vector<Halfedge>& hePath) {
   // Assumes that path is closed if it ends where it starts
