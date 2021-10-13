@@ -139,6 +139,8 @@ public:
 
   // The collection of paths which make up the network
   std::vector<std::unique_ptr<FlipEdgePath>> paths;
+  size_t pathOccupancy = 0;
+  std::map<FlipEdgePath*, size_t> pathIndex;
 
   // The paths at each edge (and helpers to access them)
   EdgeData<std::deque<FlipPathSegment>> pathsAtEdge; // front of deque is paths at e.halfedge, back is e.halfedge.twin

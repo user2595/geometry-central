@@ -313,16 +313,28 @@ FlipEdgePath* FlipEdgeNetwork::addPath(const std::vector<Halfedge>& hePath) {
   Halfedge lastHe = hePath.back();
   bool isClosed = firstHe.vertex() == lastHe.twin().vertex();
   paths.emplace_back(new FlipEdgePath(*this, hePath, isClosed));
+  pathIndex[paths[paths.size() - 1].get()] = paths.size() - 1;
+  pathOccupancy++;
   return paths[paths.size() - 1].get();
 }
 
 bool FlipEdgeNetwork::removePath(FlipEdgePath* path) {
-  for (size_t iP = 0; iP < paths.size(); iP++) {
-    if (path == paths[iP].get()) {
-      paths[iP]->removeFromNetwork();
-      paths.erase(paths.begin() + iP);
-      return true;
-    }
+  size_t iP = pathIndex[path];
+
+  paths[iP]->removeFromNetwork();
+  // paths.erase(paths.begin() + iP);
+  paths[iP].reset();
+  pathOccupancy--;
+
+  if (pathOccupancy < paths.size() / 2) {
+    // remove all null entries
+    paths.erase(std::remove(std::begin(paths), std::end(paths), nullptr), std::end(paths));
+
+    // reconfigure pathIndex map
+    pathIndex.clear();
+    for (size_t iP = 0; iP < paths.size(); iP++) pathIndex[paths[iP].get()] = iP;
+
+    return true;
   }
   return false;
 }
@@ -486,6 +498,7 @@ double FlipEdgeNetwork::minAngle() {
   double minAngle = std::numeric_limits<double>::infinity();
 
   for (auto& epPtr : paths) {
+    if (!epPtr) continue;
     FlipEdgePath& path = *epPtr;
 
     int prevInvalidCount = 0;
@@ -514,6 +527,7 @@ double FlipEdgeNetwork::minAngleIsotopy() {
   double minAngle = std::numeric_limits<double>::infinity();
 
   for (auto& epPtr : paths) {
+    if (!epPtr) continue;
     FlipEdgePath& path = *epPtr;
 
     int prevInvalidCount = 0;
@@ -1099,6 +1113,7 @@ void FlipEdgeNetwork::addToWedgeAngleQueue(const FlipPathSegment& pathSegment) {
 
 void FlipEdgeNetwork::addAllWedgesToAngleQueue() {
   for (auto& epPtr : paths) {
+    if (!epPtr) continue;
     addPathWedgesToAngleQueue(epPtr.get());
     // FlipEdgePath& path = *epPtr;
     // for (auto it : path.pathHeInfo) {
@@ -1357,6 +1372,7 @@ void FlipEdgeNetwork::rewind() {
   // == Clear any stored paths
   // Clear out edge stacks
   for (auto& epPtr : paths) {
+    if (!epPtr) continue;
     // TODO maybe do this in a desctructor of FlipEdgePath instead? Right now this is the only place removals happen.
     FlipEdgePath& path = *epPtr;
     for (auto it : path.pathHeInfo) {
@@ -1462,6 +1478,7 @@ void FlipEdgeNetwork::popSegment(Halfedge he, SegmentID sID) {
 FlipPathSegment FlipEdgeNetwork::getFirst() {
 
   for (auto& epPtr : paths) {
+    if (!epPtr) continue;
     FlipEdgePath& path = *epPtr;
 
     for (auto it : path.pathHeInfo) {
@@ -1482,6 +1499,7 @@ FlipPathSegment FlipEdgeNetwork::getFirst() {
 FlipPathSegment FlipEdgeNetwork::getLast() {
 
   for (auto& epPtr : paths) {
+    if (!epPtr) continue;
     FlipEdgePath& path = *epPtr;
 
     for (auto it : path.pathHeInfo) {
@@ -1501,6 +1519,7 @@ FlipPathSegment FlipEdgeNetwork::getLast() {
 
 void FlipEdgeNetwork::validateHalfedgesOnly() {
   for (auto& epPtr : paths) {
+    if (!epPtr) continue;
     FlipEdgePath& path = *epPtr;
 
     int prevInvalidCount = 0;
@@ -1524,6 +1543,7 @@ double FlipEdgeNetwork::length() {
   double length = 0.;
 
   for (auto& epPtr : paths) {
+    if (!epPtr) continue;
     FlipEdgePath& path = *epPtr;
 
     for (auto it : path.pathHeInfo) {
@@ -1545,6 +1565,7 @@ void FlipEdgeNetwork::validate() {
 
   // == Check that all paths are connected
   for (auto& epPtr : paths) {
+    if (!epPtr) continue;
     FlipEdgePath& path = *epPtr;
 
     int prevInvalidCount = 0;
@@ -1611,6 +1632,7 @@ void FlipEdgeNetwork::validate() {
 
   // Check that all path endpoints are marked
   for (auto& epPtr : paths) {
+    if (!epPtr) continue;
     FlipEdgePath& path = *epPtr;
 
     if (path.isClosed) continue;
@@ -1642,6 +1664,7 @@ void FlipEdgeNetwork::validate() {
   // Check that all path edges are noted as edges
   HalfedgeData<bool> halfedgeSeen(mesh, false);
   for (auto& epPtr : paths) {
+    if (!epPtr) continue;
     FlipEdgePath& path = *epPtr;
 
     for (auto it : path.pathHeInfo) {
@@ -1678,6 +1701,7 @@ std::vector<std::vector<SurfacePoint>> FlipEdgeNetwork::getPathPolyline(bool& wa
   wasPerfectOut = true;
 
   for (auto& epPtr : paths) {
+    if (!epPtr) continue;
     FlipEdgePath& path = *epPtr;
 
     // Build list of halfedges
