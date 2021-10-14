@@ -735,9 +735,8 @@ void SignpostIntrinsicTriangulation::resolveNewVertex(Vertex newV, SurfacePoint 
     outgoingVec = -inputTraceResult.endingDir;
   }
 
-
   // Set the location of our newly inserted vertex
-  vertexLocations[newV] = newPositionOnInput;
+  vertexLocations[newV] = clampToSimplex(newPositionOnInput, 0.01);
 
   // Align the new vertex's tangent space to that of the input mesh.
   double incomingAngle = standardizeAngle(newV, outgoingVec.arg());
@@ -765,6 +764,7 @@ std::vector<double> SignpostIntrinsicTriangulation::recoverTraceTValues(const st
   // Walk along the curve, measuring the length of each segment from its barcentric coordinates and the geometry of the
   // underlying triangulation
   tVals[0] = 0.;
+  tVals[tVals.size() - 1] = 1.;
   for (size_t iP = 1; iP + 1 < edgeTrace.size(); iP++) {
     SurfacePoint prev = edgeTrace[iP - 1];
     SurfacePoint next = edgeTrace[iP];
@@ -930,7 +930,7 @@ void SignpostIntrinsicTriangulation::constructCommonSubdivision() {
         vec.insert(vec.begin() + iP, &csPoint);
         // meshB
         Edge meshBEdge = csPoint.posB.edge;
-        GC_SAFETY_ASSERT(cs.pointsAlongB[meshBEdge].size() == 2, "should be exactly two points (endpoints)");
+        // GC_SAFETY_ASSERT(cs.pointsAlongB[meshBEdge].size() == 2, "should be exactly two points (endpoints)");
         cs.pointsAlongB[meshBEdge].insert(cs.pointsAlongB[meshBEdge].begin() + 1, &csPoint);
       }
     }

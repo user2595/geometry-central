@@ -100,12 +100,6 @@ public:
                   const std::vector<std::vector<Halfedge>>& paths,
                   VertexData<bool> extraMarkedVerts = VertexData<bool>());
 
-  // Construct a network from a collection of paths on an existing intrinsic triangulation
-  FlipEdgeNetwork(std::unique_ptr<SignpostIntrinsicTriangulation> tri, const std::vector<std::vector<Halfedge>>& paths,
-                  VertexData<bool> extraMarkedVerts = VertexData<bool>());
-
-  std::unique_ptr<SignpostIntrinsicTriangulation> relinquishTriangulation();
-
   // === Static initializers
 
   // Run Dijkstra between endpoints to initialize path
@@ -240,6 +234,9 @@ public:
   // Perform intrinsic delaunay refinement while preserving curve
   void delaunayRefine(double areaThresh = std::numeric_limits<double>::infinity(), size_t maxInsertions = INVALID_IND,
                       double angleBound = 25.);
+
+  // Split path edges along underlying input edges
+  void splitPathsAlongInputEdges();
 
   // Perform one round of De Casteljau Bezier subdivision
   // Network must be a connected sequence of paths forming a curve

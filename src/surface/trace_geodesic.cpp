@@ -575,12 +575,12 @@ inline TraceSubResult traceGeodesic_fromVertex(IntrinsicGeometryInterface& geom,
     }
 
     // Keep track of the closest halfedge, as described above
-    if (std::fabs(crossStart) < minCross) {
+    if (!(std::fabs(crossStart) >= minCross)) {
       minCross = std::fabs(crossStart);
       minCrossHalfedge = currHe;
       minCrossHalfedgeDir = Vector2{1, TRACE_EPS_TIGHT};
     }
-    if (std::fabs(crossEnd) < minCross) {
+    if (!(std::fabs(crossEnd) >= minCross)) {
       minCross = std::fabs(crossEnd);
       minCrossHalfedge = nextHe;
       minCrossHalfedgeDir = Vector2{1, -TRACE_EPS_TIGHT};
@@ -593,6 +593,11 @@ inline TraceSubResult traceGeodesic_fromVertex(IntrinsicGeometryInterface& geom,
   // halfedge
   if (wedgeHe == Halfedge()) {
     if (TRACE_PRINT) cout << "  no wedge worked. following closest edge with dir " << minCrossHalfedgeDir << endl;
+    // if (minCrossHalfedge == Halfedge()) {
+    //   cout << "CG WARNING: minCrossHalfedge invalid" << endl;
+    // } else {
+    //   std::cout << "Proceeding with halfedge " << minCrossHalfedge << "\t dir: " << minCrossHalfedgeDir << endl;
+    // }
     // Convert to edge coordinates
     currVecDir = convertVecToEdge(minCrossHalfedge, minCrossHalfedgeDir);
     return traceGeodesic_fromEdge(geom, minCrossHalfedge.edge(), convertTToEdge(minCrossHalfedge, 0.), currVecDir,

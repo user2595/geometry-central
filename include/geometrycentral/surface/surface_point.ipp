@@ -282,6 +282,7 @@ inline Face sharedFace(const SurfacePoint& pA, const SurfacePoint& pB) {
   // no shared face
   return Face();
 }
+
 } // namespace surface
 } // namespace geometrycentral
 
@@ -292,4 +293,3 @@ inline std::string to_string(geometrycentral::surface::SurfacePoint p) {
   return output.str();
 }
 } // namespace std
-

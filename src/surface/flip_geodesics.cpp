@@ -268,44 +268,6 @@ FlipEdgeNetwork::FlipEdgeNetwork(ManifoldSurfaceMesh& mesh_, IntrinsicGeometryIn
   validate();
 }
 
-// Construct a network from a collection of paths on an existing intrinsic triangulation
-FlipEdgeNetwork::FlipEdgeNetwork(std::unique_ptr<SignpostIntrinsicTriangulation> tri_,
-                                 const std::vector<std::vector<Halfedge>>& hePaths, VertexData<bool> extraMarkedVerts)
-    : tri(std::move(tri_)), mesh(*(tri->intrinsicMesh)), pathsAtEdge(mesh), isMarkedVertex(mesh, false) {
-  // Build initial paths from the vectors of edges (path constructor updates other structures of this class)
-  for (const std::vector<Halfedge>& hePath : hePaths) {
-    // Assumes that path is closed if it ends where it starts
-    // (this might be a problem as the default one day, but for now it is overwhelmingly likely to be what we want
-    Halfedge firstHe = hePath.front();
-    Halfedge lastHe = hePath.back();
-    bool isClosed = firstHe.vertex() == lastHe.twin().vertex();
-
-
-    // Convert to the corresponding intrinsic halfedges
-    std::vector<Halfedge> intPath(hePath.size());
-    for (size_t i = 0; i < hePath.size(); i++) {
-      intPath[i] = mesh.halfedge(hePath[i].getIndex());
-    }
-
-    paths.emplace_back(new FlipEdgePath(*this, intPath, isClosed));
-  }
-
-  // Mark any additional verts
-  if (extraMarkedVerts.size() > 0) {
-    for (Vertex v : mesh.vertices()) {
-      if (extraMarkedVerts[v.getIndex()]) {
-        isMarkedVertex[v] = true;
-      }
-    }
-  }
-
-  // Make sure everything is good to go
-  validate();
-}
-
-std::unique_ptr<SignpostIntrinsicTriangulation> FlipEdgeNetwork::relinquishTriangulation() { return std::move(tri); }
-
-
 FlipEdgePath* FlipEdgeNetwork::addPath(const std::vector<Halfedge>& hePath) {
   // Assumes that path is closed if it ends where it starts
   // (this might be a problem as the default one day, but for now it is overwhelmingly likely to be what we want
@@ -1170,12 +1132,53 @@ void FlipEdgeNetwork::delaunayRefine(double areaThresh, size_t maxInsertions, do
   auto updatePathOnSplit = [&](Edge oldE, Halfedge newHe1, Halfedge newHe2) {
     updatePathAfterEdgeSplit(oldE.halfedge(), newHe1);
   };
-  auto callbackRef = tri->edgeSplitCallbackList.insert(std::end(tri->edgeSplitCallbackList), updatePathOnSplit);
+  // auto callbackRef = tri->edgeSplitCallbackList.insert(std::end(tri->edgeSplitCallbackList), updatePathOnSplit);
 
   // == Refine!
   tri->delaunayRefine(angleBound, areaThresh, maxInsertions);
 
-  tri->edgeSplitCallbackList.erase(callbackRef); // remove the callback we registered
+  // tri->edgeSplitCallbackList.erase(callbackRef); // remove the callback we registered
+}
+
+void FlipEdgeNetwork::splitPathsAlongInputEdges() {
+  for (auto& epPtr : paths) {
+    if (!epPtr) continue;
+
+    FlipEdgePath& path = *epPtr;
+    for (auto it : path.pathHeInfo) {
+
+      // Gather values
+      SegmentID currID = it.first;
+      Halfedge currHe = std::get<0>(it.second);
+      if (currHe == Halfedge()) continue;
+
+      // std::vector<double> intermediateCrossingTimes =
+      //     tri->recoverTraceTValues(tri->traceIntrinsicHalfedgeAlongInput(currHe));
+      std::vector<double> intermediateCrossingTimes{0, 0.5, 1};
+      // std::cout << "intermediate crossings: " << std::endl;
+      // for (const auto& q : tri->traceIntrinsicHalfedgeAlongInput(currHe)) {
+      //   std::cout << "\t" << q << std::endl;
+      // }
+      // std::cout << "intermediate times: " << std::endl;
+      // for (double t : intermediateCrossingTimes) {
+      //   std::cout << "\t" << t << std::endl;
+      // }
+
+      double tSplitOff = 0;
+      FlipPathSegment currSeg{epPtr.get(), currID};
+
+      // Skip first and last time (which are 0 and 1 respectively)
+      for (size_t iT = 1; iT + 1 < fmin(intermediateCrossingTimes.size(), 2 + 5); iT++) {
+        double t = intermediateCrossingTimes[iT];
+        if (currSeg.halfedge() == Halfedge()) break;
+        currSeg.splitEdge(t - tSplitOff);
+        tSplitOff += t;
+        currSeg = currSeg.next();
+      }
+
+      if (std::isnan(intermediateCrossingTimes[0]) || std::isinf(intermediateCrossingTimes[0])) exit(1);
+    }
+  }
 }
 
 void FlipEdgeNetwork::bezierSubdivide(size_t nRounds) {

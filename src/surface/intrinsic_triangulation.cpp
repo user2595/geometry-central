@@ -325,9 +325,33 @@ void IntrinsicTriangulation::delaunayRefine(double angleThreshDegrees, double ci
   // Build a function to test if a face violates the circumradius ratio condition
   auto needsCircumcenterRefinement = [&](Face f) {
     size_t nNeedle = 0;
-    for (Vertex v : f.adjacentVertices()) {
-      if (vertexAngleSums[v] < M_PI / 3.) nNeedle++;
+    // for (Vertex v : f.adjacentVertices()) {
+    //   if (vertexAngleSums[v] < M_PI / 3.) nNeedle++;
+    // }
+    // std::cout << "face check begin" << std::endl;
+    for (Halfedge he : f.adjacentHalfedges()) {
+      double angleSum = 0;
+      Halfedge heCurr = he;
+      // std::cout << "Loop 1 begin" << std::endl;
+      do {
+        angleSum += cornerAngle(heCurr.corner());
+        heCurr = heCurr.next().next().twin();
+      } while (heCurr != he && !isFixed(heCurr.edge()));
+      // std::cout << "Loop 1 end" << std::endl;
+
+      if (heCurr != he && !isFixed(he.edge())) {
+        // std::cout << "Loop 2 begin" << std::endl;
+        heCurr = he;
+        do {
+          heCurr = heCurr.twin().next();
+          angleSum += cornerAngle(heCurr.corner());
+        } while (!isFixed(heCurr.edge()));
+        // std::cout << "Loop 2 end" << std::endl;
+      }
+
+      if (angleSum < M_PI / 3.) nNeedle++;
     }
+    // std::cout << "face check end" << std::endl;
     if (nNeedle == 1) return false;
 
     Face inputFace = getParentFace(f);

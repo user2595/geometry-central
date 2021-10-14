@@ -384,6 +384,7 @@ std::unique_ptr<SimplePolygonMesh> CommonSubdivision::buildSimpleMesh() {
 }
 
 
+static bool complainedAboutSourceFace = false;
 void CommonSubdivision::constructMeshData(std::vector<std::vector<size_t>>& faces_out,
                                           std::vector<CommonSubdivisionPoint*>& parents_out,
                                           std::vector<Face>& sourceFaceA_out, std::vector<Face>& sourceFaceB_out) {
@@ -528,7 +529,12 @@ void CommonSubdivision::constructMeshData(std::vector<std::vector<size_t>>& face
         }
       }
 
-      GC_SAFETY_ASSERT(sharedFace != Face(), "could not identify source face on mesh A")
+      // GC_SAFETY_ASSERT(sharedFace != Face(), "could not identify source face on mesh A")
+      if (sharedFace == Face() && !complainedAboutSourceFace) {
+        complainedAboutSourceFace = true;
+        std::cout << "GC WARNING: could not identify source face on mesh A [common_subdivision.cpp::constructMeshData]"
+                  << std::endl;
+      }
       sourceFaceA_out.push_back(sharedFace);
     }
   }
@@ -620,8 +626,13 @@ std::vector<std::vector<size_t>> sliceNicelyOrderedFace(const std::vector<size_t
   } else {
     // cout << "Triforce!" << endl;
     // Triforce configuration
-    GC_SAFETY_ASSERT((nij + njk + nki) % 2 == 0, "normal coordinates which obey the triangle "
-                                                 "inequality must sum to an even number");
+    // GC_SAFETY_ASSERT((nij + njk + nki) % 2 == 0, "normal coordinates which obey the triangle "
+    //                                              "inequality must sum to an even number");
+    if ((nij + njk + nki) % 2 != 0) {
+      std::cout << "GC WARNING: normal coordinates which obey the triangle inequality must sum to an even number"
+                << std::endl;
+      return {};
+    }
 
     // Corner coordinates
     size_t ci = (nij - njk + nki) / 2;

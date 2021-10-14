@@ -134,6 +134,41 @@ bool onSameElement(const SurfacePoint& pA, const SurfacePoint& pB) {
   return false;
 }
 
+SurfacePoint clampToSimplex(const SurfacePoint& pt, double tol) {
+  switch (pt.type) {
+  case SurfacePointType::Vertex:
+    return pt;
+  case SurfacePointType::Edge:
+    if (pt.tEdge < tol) {
+      return SurfacePoint(pt.edge.halfedge().tailVertex());
+    } else if (pt.tEdge > 1 - tol) {
+      return SurfacePoint(pt.edge.halfedge().tipVertex());
+    }
+    return pt;
+  case SurfacePointType::Face:
+    if (pt.faceCoords.x < tol) {
+      if (pt.faceCoords.y < tol) {
+        return SurfacePoint(pt.face.halfedge().next().next().vertex());
+      } else if (pt.faceCoords.z < tol) {
+        return SurfacePoint(pt.face.halfedge().next().vertex());
+      } else {
+        return SurfacePoint(pt.face.halfedge().next(), pt.faceCoords.z);
+      }
+    } else if (pt.faceCoords.y < tol) {
+      // x must be > tol
+      if (pt.faceCoords.z < tol) {
+        return SurfacePoint(pt.face.halfedge().vertex());
+      } else {
+        return SurfacePoint(pt.face.halfedge().next().next(), pt.faceCoords.x);
+      }
+    } else if (pt.faceCoords.z < tol) {
+      // x and y must be > tol
+      return SurfacePoint(pt.face.halfedge(), pt.faceCoords.y);
+    }
+    return pt;
+  }
+}
+
 
 } // namespace surface
 } // namespace geometrycentral

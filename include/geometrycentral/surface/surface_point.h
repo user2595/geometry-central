@@ -19,11 +19,11 @@ enum class SurfacePointType { Vertex = 0, Edge, Face };
 struct SurfacePoint {
 
   // === Constructors
-  SurfacePoint();                           // default: yields invalid SurfacePoint with Type::Vertex and null vertex
-  SurfacePoint(Vertex v);                   // at vertex
-  SurfacePoint(Edge e, double tEdge);       // in edge
+  SurfacePoint();                              // default: yields invalid SurfacePoint with Type::Vertex and null vertex
+  SurfacePoint(Vertex v);                      // at vertex
+  SurfacePoint(Edge e, double tEdge);          // in edge
   SurfacePoint(Halfedge he, double tHalfedge); // in edge (flips direction if needed)
-  SurfacePoint(Face f, Vector3 faceCoords); // in face
+  SurfacePoint(Face f, Vector3 faceCoords);    // in face
 
 
   // === Identifying data
@@ -55,7 +55,6 @@ struct SurfacePoint {
   // Return the nearest vertex to this surface point
   inline Vertex nearestVertex() const;
 
-
   // Linearly interpolate data at vertices to this point.
   // T must support addition and multiplication by a double.
   template <typename T>
@@ -80,6 +79,8 @@ bool onSameElement(const SurfacePoint& pA, const SurfacePoint& pB);
 // Return some face which both points are on or adjacent to. Returns Face() if non exists.
 inline Face sharedFace(const SurfacePoint& pA, const SurfacePoint& pB);
 
+SurfacePoint clampToSimplex(const SurfacePoint& pt, double tol = 1e-6);
+
 
 // Printing
 ::std::ostream& operator<<(std::ostream& output, const SurfacePoint& p);
@@ -92,4 +93,3 @@ std::string to_string(geometrycentral::surface::SurfacePoint p);
 }
 
 #include "geometrycentral/surface/surface_point.ipp"
-
