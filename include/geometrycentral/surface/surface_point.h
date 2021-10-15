@@ -64,6 +64,7 @@ struct SurfacePoint {
   // Throws an exception if the surface point is invalid in any way
   inline void validate() const;
 
+  inline SurfacePoint reinterpretTo(SurfaceMesh& mesh) const;
 
   // === Operators
   bool operator==(const SurfacePoint& other) const;

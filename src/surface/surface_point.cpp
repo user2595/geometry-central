@@ -169,6 +169,5 @@ SurfacePoint clampToSimplex(const SurfacePoint& pt, double tol) {
   }
 }
 
-
 } // namespace surface
 } // namespace geometrycentral

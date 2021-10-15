@@ -1204,7 +1204,7 @@ void FlipEdgeNetwork::splitPathsAlongInputEdges() {
       FlipPathSegment currSeg{epPtr.get(), currID};
 
       // Skip first and last time (which are 0 and 1 respectively)
-      for (size_t iT = 1; iT + 1 < fmin(intermediateCrossingTimes.size(), 2 + 5); iT++) {
+      for (size_t iT = 1; iT + 1 < intermediateCrossingTimes.size(); iT++) {
         double t = intermediateCrossingTimes[iT];
         if (currSeg.halfedge() == Halfedge()) break;
         currSeg.splitEdge(t - tSplitOff);

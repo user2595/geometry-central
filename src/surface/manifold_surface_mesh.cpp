@@ -1264,7 +1264,6 @@ Vertex ManifoldSurfaceMesh::collapseEdgeTriangular(Edge e) {
 }
 
 
-
 bool ManifoldSurfaceMesh::removeFaceAlongBoundary(Face f) {
 
   // Find the boundary halfedge

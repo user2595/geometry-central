@@ -233,6 +233,19 @@ inline void SurfacePoint::validate() const {
   }
 }
 
+inline SurfacePoint SurfacePoint::reinterpretTo(SurfaceMesh& mesh) const {
+  switch (type) {
+  case SurfacePointType::Vertex:
+    if (vertex == Vertex()) return Vertex();
+    return SurfacePoint(mesh.vertex(vertex.getIndex()));
+  case SurfacePointType::Edge:
+    return SurfacePoint(mesh.edge(edge.getIndex()), tEdge);
+  case SurfacePointType::Face:
+    return SurfacePoint(mesh.face(face.getIndex()), faceCoords);
+  }
+  return SurfacePoint(); // should never be reached
+}
+
 inline bool SurfacePoint::operator==(const SurfacePoint& other) const {
   if (type != other.type) return false;
   switch (type) {
