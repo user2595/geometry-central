@@ -184,6 +184,25 @@ Face IntrinsicTriangulation::getParentFace(Face f) const {
   return Face();
 }
 
+double IntrinsicTriangulation::getCornerAngle(Corner c) const {
+  Halfedge heA = c.halfedge();
+  Halfedge heOpp = heA.next();
+  Halfedge heB = heOpp.next();
+
+  GC_SAFETY_ASSERT(heB.next() == heA, "faces mush be triangular");
+
+  double lOpp = edgeLengths[heOpp.edge()];
+  double lA = edgeLengths[heA.edge()];
+  double lB = edgeLengths[heB.edge()];
+
+  double angleCosine = (lA * lA + lB * lB - lOpp * lOpp) / (2. * lA * lB);
+  angleCosine = clamp(angleCosine, -1.0, 1.0);
+
+  double angle = std::acos(angleCosine);
+
+  return angle;
+}
+
 double IntrinsicTriangulation::minAngleDegreesAtValidFaces(double minAngleSum) const {
   auto faceHasLargeAngleSums = [&](Face f) -> bool {
     for (Vertex v : f.adjacentVertices()) {
@@ -267,6 +286,36 @@ Vertex IntrinsicTriangulation::insertCircumcenter(Face f) {
 Vertex IntrinsicTriangulation::insertBarycenter(Face f) {
   SurfacePoint barycenterOnIntrinsic(f, Vector3::constant(1. / 3.));
   return insertVertex(barycenterOnIntrinsic);
+}
+
+std::vector<double> IntrinsicTriangulation::recoverTraceTValues(const std::vector<SurfacePoint>& edgeTrace) {
+  std::vector<double> tVals(edgeTrace.size());
+
+  // Walk along the curve, measuring the length of each segment from its barcentric coordinates and the geometry of the
+  // underlying triangulation
+  tVals[0] = 0.;
+  tVals[tVals.size() - 1] = 1.;
+  for (size_t iP = 1; iP + 1 < edgeTrace.size(); iP++) {
+    SurfacePoint prev = edgeTrace[iP - 1];
+    SurfacePoint next = edgeTrace[iP];
+    Face f = sharedFace(prev, next);
+    prev = prev.inFace(f);
+    next = next.inFace(f);
+    Vector3 triangleLengths{inputGeom.edgeLengths[f.halfedge().edge()],
+                            inputGeom.edgeLengths[f.halfedge().next().edge()],
+                            inputGeom.edgeLengths[f.halfedge().next().next().edge()]};
+    Vector3 disp = next.faceCoords - prev.faceCoords;
+    double len = displacementLength(disp, triangleLengths);
+    tVals[iP] = tVals[iP - 1] + len;
+  }
+
+  // normalize to [0,1]
+  double totalLen = tVals.back();
+  for (double& t : tVals) {
+    t /= totalLen;
+  }
+
+  return tVals;
 }
 
 // ======================================================

@@ -1,7 +1,8 @@
 #pragma once
 
 #include "geometrycentral/surface/manifold_surface_mesh.h"
-#include "geometrycentral/surface/signpost_intrinsic_triangulation.h"
+// #include "geometrycentral/surface/signpost_intrinsic_triangulation.h"
+#include "geometrycentral/surface/integer_coordinates_intrinsic_triangulation.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
 
 #include <list>
@@ -128,7 +129,7 @@ public:
   // === Properties
 
   // The triangulation that the path is defined on
-  std::unique_ptr<SignpostIntrinsicTriangulation> tri;
+  std::unique_ptr<IntegerCoordinatesIntrinsicTriangulation> tri;
   ManifoldSurfaceMesh& mesh; // the intrinsic mesh
 
   // The collection of paths which make up the network

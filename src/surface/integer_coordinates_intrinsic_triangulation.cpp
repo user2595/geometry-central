@@ -36,7 +36,7 @@ IntegerCoordinatesIntrinsicTriangulation::IntegerCoordinatesIntrinsicTriangulati
   normalCoordinates.setCurvesFromEdges(*intrinsicMesh);
 
   // TODO document/expose this somehow, rather than just doing it silently
-  if(mollifyEPS > 0) {
+  if (mollifyEPS > 0) {
     mollifyIntrinsic(*intrinsicMesh, edgeLengths, mollifyEPS);
   }
 
@@ -165,7 +165,7 @@ std::vector<SurfacePoint> IntegerCoordinatesIntrinsicTriangulation::traceInputHa
 
 SurfacePoint IntegerCoordinatesIntrinsicTriangulation::equivalentPointOnIntrinsic(const SurfacePoint& pointOnInput) {
   // TODO
-  throw std::runtime_error("not implemented");
+  throw std::runtime_error("equivalentPointOnIntrinsic not implemented");
   return SurfacePoint(Vertex());
 }
 
@@ -183,6 +183,7 @@ SurfacePoint IntegerCoordinatesIntrinsicTriangulation::equivalentPointOnInput(co
   return SurfacePoint(); // unreachable
 }
 
+bool IntegerCoordinatesIntrinsicTriangulation::checkEdgeOriginal(Edge e) const { return normalCoordinates[e] == -1; }
 
 void IntegerCoordinatesIntrinsicTriangulation::constructCommonSubdivision() {
 
@@ -507,7 +508,6 @@ bool IntegerCoordinatesIntrinsicTriangulation::flipEdgeIfPossible(Edge e) {
 }
 
 
-
 double IntegerCoordinatesIntrinsicTriangulation::checkFlip(Edge e) {
   // Can't flip
   if (isFixed(e)) return std::numeric_limits<double>::infinity();
@@ -673,136 +673,20 @@ IntegerCoordinatesIntrinsicTriangulation::computeFaceSplitData(Face f, Vector3 b
   } else if (normalCoordinates[f.halfedge().edge()] <= 0 && normalCoordinates[f.halfedge().next().edge()] <= 0 &&
              normalCoordinates[f.halfedge().next().next().edge()] <= 0) {
 
-    // TODO: use getParentFace
-    insertionFace = Face();
-    // First, look for a FacePoint - that's the easiest thing to deal with
-    for (Vertex v : f.adjacentVertices()) {
-      if (vertexLocations[v].type == SurfacePointType::Face) {
-        if (insertionFace != Face()) {
-          // all faces should agree
-          GC_SAFETY_ASSERT(insertionFace == vertexLocations[v].face, "if there are no crossings, this face must "
-                                                                     "be contained inside a single input face");
-        } else {
-          insertionFace = vertexLocations[v].face;
-        }
-      }
-    }
-
-    if (insertionFace == Face()) {
-      // If we couldn't find a FacePoint, look for an EdgePoint
-      // Note that not all vertices can be shared - if they are, then we
-      // can't have any boundary crossings. But this happens sometimes
-      // anyway, and is handled next
-
-      auto containsVertex = [](Face f, Vertex v) -> bool {
-        for (Vertex vF : f.adjacentVertices()) {
-          if (vF == v) return true;
-        }
-        return false;
-      };
-
-      auto containsEdge = [](Face f, Edge e) -> bool {
-        for (Edge eF : f.adjacentEdges()) {
-          if (eF == e) return true;
-        }
-        return false;
-      };
-
-      auto compatible = [&](const SurfacePoint& pt, Face f) -> bool {
-        switch (pt.type) {
-        case SurfacePointType::Vertex:
-          return containsVertex(f, pt.vertex);
-        case SurfacePointType::Edge:
-          return containsEdge(f, pt.edge);
-        case SurfacePointType::Face:
-          return pt.face == f;
-        }
-        return false; // unreachable
-      };
-
-      for (Vertex v : f.adjacentVertices()) {
-        if (vertexLocations[v].type == SurfacePointType::Edge) {
-          Edge e = vertexLocations[v].edge;
-          Face f1 = e.halfedge().face();
-          Face f2 = e.halfedge().twin().face();
-
-          bool f1Okay = e.halfedge().isInterior();
-          bool f2Okay = e.halfedge().twin().isInterior();
-
-          for (Vertex w : f.adjacentVertices()) {
-            f1Okay = f1Okay && compatible(vertexLocations[w], f1);
-            f2Okay = f2Okay && compatible(vertexLocations[w], f2);
-          }
-
-          if ((f1 != f2) && (f1Okay && f2Okay)) {
-            std::cerr << "splitFace err: There are two options for an "
-                         "input "
-                         "face to insert "
-                         "in, and they both look fine. What should I "
-                         "do?. (In the meantime, I'm picking option 1)"
-                      << std::endl;
-          }
-
-          if (f1Okay) {
-            insertionFace = f1;
-          } else if (f2Okay) {
-            insertionFace = f2;
-          } else {
-            std::cout << " ==== Failed to find valid face to insert" << std::endl;
-            std::cout << "f1: " << f1 << " (isBoundaryLoop: " << f1.isBoundaryLoop() << ")" << std::endl;
-            std::cout << "f2: " << f2 << " (isBoundaryLoop: " << f2.isBoundaryLoop() << ")" << std::endl;
-            std::cout << "Underlying edge: " << e << " (isBoundary: " << e.isBoundary() << ")" << std::endl;
-
-            throw std::runtime_error("Could not find a valid face in inputMesh to "
-                                     "insert the new vertex into");
-          }
-        }
-      }
-    }
-
-    if (insertionFace == Face()) {
-      // In really degenerate situations, we can have triangles between
-      // three
-      bool allSharedVertices = true;
-      for (Vertex v : f.adjacentVertices()) {
-        allSharedVertices = allSharedVertices && vertexLocations[v].type == SurfacePointType::Vertex;
-      }
-      if (allSharedVertices) {
-        // Hope that we find a shared edge. If not, something terrible
-        // has happened
-        std::cout << vertexLocations[intrinsicMesh->vertex(2336)] << std::endl;
-        for (Halfedge he : f.adjacentHalfedges()) {
-          std::cout << std::endl;
-        }
-
-        for (Halfedge he : f.adjacentHalfedges()) {
-          if (normalCoordinates[he.edge()] < 0) {
-            Halfedge inputHalfedge = identifyInputEdge(he);
-            insertionFace = inputHalfedge.face();
-            insertionBary = bary;
-
-            if (inputHalfedge == insertionFace.halfedge()) {
-              // good!
-            } else if (inputHalfedge == insertionFace.halfedge().next()) {
-              insertionBary = rotate(rotate(insertionBary));
-            } else if (inputHalfedge == insertionFace.halfedge().next().next()) {
-              insertionBary = rotate(insertionBary);
-            } else {
-              throw std::runtime_error("Face " + std::to_string(insertionFace) + " is not triangular");
-            }
-            counts = {0, 0, 0};
-            break;
-          }
-        }
-      }
-    }
-
-    GC_SAFETY_ASSERT(insertionFace != Face(), "failed to find FacePoint.");
+    insertionFace = getParentFace(f);
 
     std::array<Vector3, 3> vertexBary;
     size_t iV = 0;
     for (Vertex v : f.adjacentVertices()) {
-      vertexBary[iV] = vertexLocations[v].inFace(insertionFace).faceCoords;
+      if (insertionFace == Face()) {
+        std::cout << "Error: could not find parent face?" << std::endl;
+      }
+      try {
+        vertexBary[iV] = vertexLocations[v].inFace(insertionFace).faceCoords;
+      } catch (std::exception& e) {
+        std::cout << "Error: " << vertexLocations[v] << " not adjacent to " << insertionFace << "?!" << std::endl;
+        throw e;
+      }
       iV++;
     }
 
@@ -1244,16 +1128,16 @@ Vertex IntegerCoordinatesIntrinsicTriangulation::splitFace(Face f, Vector3 bary,
 }
 
 Halfedge IntegerCoordinatesIntrinsicTriangulation::splitEdge(Halfedge he, double tSplit) {
-  // FIXME need to  return correct halfedge, so can't just call function below
-  throw std::runtime_error("not implemented");
-  return Halfedge();
+  return (he.edge().isBoundary()) ? splitBoundaryEdge(he, tSplit) : splitInteriorEdge(he, tSplit);
 }
 
 Vertex IntegerCoordinatesIntrinsicTriangulation::splitEdge(Edge e, double bary, bool verbose) {
-  return (e.isBoundary()) ? splitBoundaryEdge(e, bary, verbose) : splitInteriorEdge(e, bary, verbose);
+  return (e.isBoundary()) ? splitBoundaryEdge(e.halfedge(), bary, verbose).vertex()
+                          : splitInteriorEdge(e.halfedge(), bary, verbose).vertex();
 }
 
-Vertex IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Edge e, double bary, bool verbose) {
+Halfedge IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Halfedge he, double bary, bool verbose) {
+  Edge e = he.edge();
   auto inEdge = [](Edge e, SurfacePoint p) -> SurfacePoint {
     switch (p.type) {
     case SurfacePointType::Vertex:
@@ -1298,7 +1182,7 @@ Vertex IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Edge e, doubl
                              "below for the == 0 case should be sufficient. But it's untested "
                              "for == 0, so uncomment this and try it.");
 
-    return Vertex();
+    return Halfedge();
 
     /*
     // Easy case - edge not shared
@@ -1308,13 +1192,13 @@ Vertex IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Edge e, doubl
     // throw std::runtime_error("Not fully implemented yet - need to mark
     // split segments as fixed if e is");
 
-    Vertex vTipBefore  = e.halfedge().tipVertex();
-    Vertex vTailBefore = e.halfedge().tailVertex();
+    Vertex vTipBefore  = he.tipVertex();
+    Vertex vTailBefore = he.tailVertex();
     bool fixedBefore   = isFixed[e];
     isFixed[e]         = false;
 
     Vertex newVertex =
-        splitFace(e.halfedge().face(), heBary(e.halfedge(), bary));
+        splitFace(he.face(), heBary(he, bary));
     flipEdgeIfPossible(e);
 
 
@@ -1350,15 +1234,15 @@ Vertex IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Edge e, doubl
     if (verbose) std::cout << "Shared Edge Split" << std::endl;
     // Hard case - edge also exists in input mesh
     Edge inputEdge;
-    SurfacePoint src = vertexLocations[e.halfedge().tailVertex()];
-    SurfacePoint dst = vertexLocations[e.halfedge().tipVertex()];
+    SurfacePoint src = vertexLocations[he.tailVertex()];
+    SurfacePoint dst = vertexLocations[he.tipVertex()];
 
     if (src.type == SurfacePointType::Edge) {
       inputEdge = src.edge;
     } else if (dst.type == SurfacePointType::Edge) {
       inputEdge = dst.edge;
     } else {
-      inputEdge = getSharedInputEdge(e.halfedge()).edge();
+      inputEdge = getSharedInputEdge(he).edge();
     }
 
     double tSrc = inEdge(inputEdge, src).tEdge;
@@ -1373,8 +1257,7 @@ Vertex IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Edge e, doubl
     // Compute new edge lengths
     double oldLen = edgeLengths[e];
     std::array<double, 3> newEdgeLengths{(1 - bary) * oldLen, 0, bary * oldLen};
-    newEdgeLengths[1] = displacementLength(heBary(e.halfedge(), bary) - heBary(e.halfedge().next(), 1),
-                                           faceEdgeLengths(e.halfedge().face()));
+    newEdgeLengths[1] = displacementLength(heBary(he, bary) - heBary(he.next(), 1), faceEdgeLengths(he.face()));
 
     std::array<bool, 3> newEdgeFixed{isFixed(e), false, isFixed(e)};
 
@@ -1435,11 +1318,12 @@ Vertex IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Edge e, doubl
     triangulationChanged();
     invokeEdgeSplitCallbacks(e, newHalfedge, newHalfedge.next().next().twin().next().next().twin());
 
-    return newVertex;
+    return newHalfedge;
   }
 }
 
-Vertex IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Edge e, double bary, bool verbose) {
+Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he, double bary, bool verbose) {
+  Edge e = he.edge();
   auto inEdge = [](Edge e, SurfacePoint p) -> SurfacePoint {
     switch (p.type) {
     case SurfacePointType::Vertex:
@@ -1476,24 +1360,56 @@ Vertex IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Edge e, doubl
                    edgeLengths[f.halfedge().edge()]};
   };
 
+  SurfacePoint inputPoint;
+  if (normalCoordinates[e] >= 0) {
+    inputPoint = equivalentPointOnInput(SurfacePoint(he, bary));
+  } else {
+    Edge inputEdge;
+    SurfacePoint src = vertexLocations[he.tailVertex()];
+    SurfacePoint dst = vertexLocations[he.tipVertex()];
+
+    if (src.type == SurfacePointType::Edge) {
+      inputEdge = src.edge;
+    } else if (dst.type == SurfacePointType::Edge) {
+      inputEdge = dst.edge;
+    } else {
+      inputEdge = getSharedInputEdge(he).edge();
+    }
+
+    double tSrc = inEdge(inputEdge, src).tEdge;
+    double tDst = inEdge(inputEdge, dst).tEdge;
+
+    double tInsertion = (1 - bary) * tSrc + bary * tDst;
+
+    inputPoint = SurfacePoint(inputEdge, tInsertion);
+  }
+
+  /*
   if (normalCoordinates[e] >= 0) {
     if (verbose) std::cout << "Easy Edge Split" << std::endl;
     // Easy case - edge not shared
     // TODO: use normal coordinate edge split code explicitly - it
     // needs fewer geodesic crossing points
 
-    Vertex vTipBefore = e.halfedge().tipVertex();
-    Vertex vTailBefore = e.halfedge().tailVertex();
-    bool fixedBefore = isFixed(e);
+    // Vertex vTipBefore = he.tipVertex();
+    // Vertex vTailBefore = he.tailVertex();
+    // bool fixedBefore = isFixed(e);
 
-    Vertex newVertex = splitFace(e.halfedge().face(), heBary(e.halfedge(), bary));
-    bool flipHappened = flipEdgeIfPossible(e);
+    std::array<int, 4> newNormalCoordinates = normalCoordinates.computeInteriorEdgeSplitDataGeodesic(*this, e, bary);
 
-    if (!flipHappened) throw std::runtime_error("pos-split flip failed!");
+    // "edge 2"
+    Halfedge newHalfedge = intrinsicMesh->splitEdgeTriangular(e); // TODO: use mutation Manager
+    Vertex newVertex = newHalfedge.vertex();
+    vertexLocations[newVertex] = inputPoint;
 
-    // Find two of the halfedges that together make up the old edge
-    Halfedge newHalfedge = e.halfedge().prevOrbitFace().twin();
-    Halfedge otherNewHalfedge = newHalfedge.next().next().twin().next().next().twin();
+    // // Vertex newVertex = splitFace(he.face(), heBary(he, bary));
+    // bool flipHappened = flipEdgeIfPossible(e);
+
+    // if (!flipHappened) throw std::runtime_error("pos-split flip failed!");
+
+    // // Find two of the halfedges that together make up the old edge
+    // Halfedge newHalfedge = he.prevOrbitFace().twin();
+    // Halfedge otherNewHalfedge = newHalfedge.next().next().twin().next().next().twin();
 
 
     // Update is-fixed array
@@ -1502,54 +1418,6 @@ Vertex IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Edge e, doubl
     // isFixed[newHalfedge.edge()] = true;
     // isFixed[otherNewHalfedge.edge()] = true;
     //}
-
-    triangulationChanged();
-    invokeEdgeSplitCallbacks(e, newHalfedge, otherNewHalfedge);
-
-    return newVertex;
-
-  } else {
-    if (verbose) std::cout << "Shared Edge Split" << std::endl;
-    // Hard case - edge also exists in input mesh
-    Edge inputEdge;
-    SurfacePoint src = vertexLocations[e.halfedge().tailVertex()];
-    SurfacePoint dst = vertexLocations[e.halfedge().tipVertex()];
-
-    if (src.type == SurfacePointType::Edge) {
-      inputEdge = src.edge;
-    } else if (dst.type == SurfacePointType::Edge) {
-      inputEdge = dst.edge;
-    } else {
-      inputEdge = getSharedInputEdge(e.halfedge()).edge();
-    }
-
-    double tSrc = inEdge(inputEdge, src).tEdge;
-    double tDst = inEdge(inputEdge, dst).tEdge;
-
-    double tInsertion = (1 - bary) * tSrc + bary * tDst;
-
-    SurfacePoint inputPoint(inputEdge, tInsertion);
-
-    std::array<int, 4> newNormalCoordinates = normalCoordinates.computeInteriorEdgeSplitDataGeodesic(*this, e, bary);
-
-    // Compute new edge lengths
-    double oldLen = edgeLengths[e];
-    std::array<double, 4> newEdgeLengths{0, (1 - bary) * oldLen, 0, bary * oldLen};
-    newEdgeLengths[0] =
-        displacementLength(heBary(e.halfedge().twin(), 1 - bary) - heBary(e.halfedge().twin().next(), 1),
-                           faceEdgeLengths(e.halfedge().twin().face()));
-    newEdgeLengths[2] = displacementLength(heBary(e.halfedge(), bary) - heBary(e.halfedge().next(), 1),
-                                           faceEdgeLengths(e.halfedge().face()));
-
-    std::array<bool, 4> newEdgeFixed{false, isFixed(e), false, isFixed(e)};
-
-    // "edge 2"
-    Halfedge newHalfedge = intrinsicMesh->splitEdgeTriangular(e); // TODO: use mutation Manager
-    Vertex newVertex = newHalfedge.vertex();
-    vertexLocations[newVertex] = inputPoint;
-
-    // TODO: write applyVertexInsertionData in NormalCoordinates
-    // class
 
     size_t iE = 1; // TODO: fix indexing convention
     for (Halfedge he : newVertex.outgoingHalfedges()) {
@@ -1570,34 +1438,80 @@ Vertex IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Edge e, doubl
       iE = (iE + 3) % 4;
     }
 
-    for (Halfedge he : newVertex.outgoingHalfedges()) {
-      // depends on normalCoordinates.edgeCoords
-      normalCoordinates.setRoundaboutFromPrevRoundabout(he.twin());
-      normalCoordinates.roundabouts[he] = 0;
-    }
-    normalCoordinates.roundaboutDegrees[newVertex] = 0;
-
-    // Update quantities
-
-    for (Face f : newVertex.adjacentFaces()) {
-
-      // depends on edgeLengths, faceAreas
-      updateFaceBasis(f);
-    }
-
-    for (Vertex v : newVertex.adjacentVertices()) {
-      // depends on vertexAngleSums
-      updateHalfedgeVectorsInVertex(v);
-    }
-
-    vertexAngleSums[newVertex] = 2 * M_PI;
-    updateHalfedgeVectorsInVertex(newVertex);
-
     triangulationChanged();
-    invokeEdgeSplitCallbacks(e, newHalfedge, newHalfedge.next().next().twin().next().next().twin());
+    invokeEdgeSplitCallbacks(e, newHalfedge, otherNewHalfedge);
 
-    return newVertex;
+    return newHalfedge;
+
+  } else {
+  if (verbose) std::cout << "Shared Edge Split" << std::endl; */
+  // Hard case - edge also exists in input mesh
+  std::array<int, 4> newNormalCoordinates = normalCoordinates.computeInteriorEdgeSplitDataGeodesic(*this, e, bary);
+
+  // Compute new edge lengths
+  double oldLen = edgeLengths[e];
+  std::array<double, 4> newEdgeLengths{0, (1 - bary) * oldLen, 0, bary * oldLen};
+  newEdgeLengths[0] =
+      displacementLength(heBary(he.twin(), 1 - bary) - heBary(he.twin().next(), 1), faceEdgeLengths(he.twin().face()));
+  newEdgeLengths[2] = displacementLength(heBary(he, bary) - heBary(he.next(), 1), faceEdgeLengths(he.face()));
+
+  std::array<bool, 4> newEdgeFixed{false, isFixed(e), false, isFixed(e)};
+
+  // "edge 2"
+  Halfedge newHalfedge = intrinsicMesh->splitEdgeTriangular(e); // TODO: use mutation Manager
+  Vertex newVertex = newHalfedge.vertex();
+  vertexLocations[newVertex] = inputPoint;
+
+  // TODO: write applyVertexInsertionData in NormalCoordinates
+  // class
+
+  size_t iE = 1; // TODO: fix indexing convention
+  for (Halfedge he : newVertex.outgoingHalfedges()) {
+    Edge e = he.edge();
+
+    edgeLengths[e] = newEdgeLengths[iE];
+    normalCoordinates.edgeCoords[e] = newNormalCoordinates[iE];
+
+    // nsharp: don't need this, managed by callback
+    // if (!isFixed[e] && newEdgeFixed[iE]) {
+    // isFixed[e] = true;
+    //// fixedEdges.push_back(e);
+    //} else if (isFixed[e] && !newEdgeFixed[iE]) {
+    // throw std::runtime_error("Need to remove e from the fixed list");
+    //}
+
+    // indexing goes counterclockwise, but loop goes clockwise
+    iE = (iE + 3) % 4;
   }
+
+  for (Halfedge he : newVertex.outgoingHalfedges()) {
+    // depends on normalCoordinates.edgeCoords
+    normalCoordinates.setRoundaboutFromPrevRoundabout(he.twin());
+    normalCoordinates.roundabouts[he] = 0;
+  }
+  normalCoordinates.roundaboutDegrees[newVertex] = 0;
+
+  // Update quantities
+
+  for (Face f : newVertex.adjacentFaces()) {
+
+    // depends on edgeLengths, faceAreas
+    updateFaceBasis(f);
+  }
+
+  for (Vertex v : newVertex.adjacentVertices()) {
+    // depends on vertexAngleSums
+    updateHalfedgeVectorsInVertex(v);
+  }
+
+  vertexAngleSums[newVertex] = 2 * M_PI;
+  updateHalfedgeVectorsInVertex(newVertex);
+
+  triangulationChanged();
+  invokeEdgeSplitCallbacks(e, newHalfedge, newHalfedge.next().next().twin().next().next().twin());
+
+  return newHalfedge;
+  // }
 }
 
 Face IntegerCoordinatesIntrinsicTriangulation::removeInsertedVertex(Vertex v) {
@@ -2085,6 +1999,8 @@ Face IntegerCoordinatesIntrinsicTriangulation::getParentFace(Face f) const {
       // Check if this works for everyone else
       for (Vertex w : f.adjacentVertices()) {
         if (!compatible(vertexLocations[w], parentFace)) {
+          std::cout << "Big problem: " << v << " lies at " << vP << ", but " << w << " is located at "
+                    << vertexLocations[w] << " which is not compatible" << std::endl;
           return Face();
         }
       }
@@ -2112,7 +2028,18 @@ Face IntegerCoordinatesIntrinsicTriangulation::getParentFace(Face f) const {
     }
   }
 
-  // Give up
+  // All vertices are shared. Just return any face which contains these three vertices.
+  // TODO: in really extreme delta complexes, this could give the wrong result
+  Vertex u = vertexLocations[f.halfedge().vertex()].vertex;
+  Vertex v = vertexLocations[f.halfedge().next().vertex()].vertex;
+  Vertex w = vertexLocations[f.halfedge().next().next().vertex()].vertex;
+
+  for (Face f : u.adjacentFaces()) {
+    if (containsVertex(f, v) && containsVertex(f, w)) return f;
+  }
+
+  // Give up. Something has gone terribly wrong
+  std::cout << "!!??" << std::endl;
   return Face();
 }
 

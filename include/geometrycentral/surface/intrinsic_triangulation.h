@@ -128,6 +128,12 @@ public:
   // face Otherwise return Face()
   Face getParentFace(Face f) const;
 
+  // Check if edge is shared with input mesh
+  virtual bool checkEdgeOriginal(Edge e) const = 0;
+
+  // Immediate computation of corner angle
+  double getCornerAngle(Corner c) const;
+
   // ======================================================
   // ======== High-Level Mutators
   // ======================================================
@@ -184,6 +190,13 @@ public:
 
   // Split an edge
   virtual Halfedge splitEdge(Halfedge he, double tSplit) = 0;
+
+
+  // ==== Misc
+  // Recover t-values after tracing
+  // Note that really we ought to just report these back from the tracing routine itself, which computes them
+  // internally. We don't have a nice API for passing that data around, so this lazily recovers it
+  std::vector<double> recoverTraceTValues(const std::vector<SurfacePoint>& edgeTrace);
 
   // ======================================================
   // ======== Callbacks

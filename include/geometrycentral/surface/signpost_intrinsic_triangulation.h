@@ -49,6 +49,8 @@ public:
   std::vector<SurfacePoint> traceInputHalfedgeAlongIntrinsic(Halfedge inputHe) override;
   std::vector<SurfacePoint> traceInputHalfedgeAlongIntrinsic(Halfedge inputHe, bool trimEnd);
 
+  bool checkEdgeOriginal(Edge e) const override;
+
   // ======================================================
   // ======== Low-Level Mutators
   // ======================================================
@@ -75,12 +77,6 @@ public:
   // Split an edge
   Halfedge splitEdge(Halfedge he, double tSplit) override;
 
-
-  // ==== Misc
-  // Recover t-values after tracing
-  // Note that really we ought to just report these back from the tracing routine itself, which computes them
-  // internally. We don't have a nice API for passing that data around, so this lazily recovers it
-  std::vector<double> recoverTraceTValues(const std::vector<SurfacePoint>& edgeTrace);
 
 protected:
 private:

@@ -48,6 +48,8 @@ public:
   EdgeData<std::vector<SurfacePoint>> traceAllInputEdgesAlongIntrinsic() override;
   std::vector<SurfacePoint> traceInputHalfedgeAlongIntrinsic(Halfedge inputHe) override;
 
+  bool checkEdgeOriginal(Edge e) const override;
+
   // ======================================================
   // ======== Low-Level Mutators
   // ======================================================
@@ -64,7 +66,8 @@ public:
 
   Halfedge splitEdge(Halfedge he, double tSplit) override;
 
-  // Check if an edge can be flipped geometrically, as defined by the (relative) signed areas of the resulting triangles; positive values mean flippable.
+  // Check if an edge can be flipped geometrically, as defined by the (relative) signed areas of the resulting
+  // triangles; positive values mean flippable.
   double checkFlip(Edge e);
 
   // Insert circumcenter or split segment
@@ -72,8 +75,8 @@ public:
 
   Vertex splitFace(Face f, Vector3 bary, bool verbose = false);
   Vertex splitEdge(Edge e, double bary, bool verbose = false);
-  Vertex splitInteriorEdge(Edge e, double bary, bool verbose = false);
-  Vertex splitBoundaryEdge(Edge e, double bary, bool verbose = false);
+  Halfedge splitInteriorEdge(Halfedge he, double bary, bool verbose = false);
+  Halfedge splitBoundaryEdge(Halfedge he, double bary, bool verbose = false);
 
   // Move a vertex `v` in direction `vec`, represented as a vector in the
   // vertex's tangent space.
@@ -134,10 +137,6 @@ private:
   // Construct the common subdivision for the current triangulation.
   void constructCommonSubdivision() override;
 };
-
-// Compute the cotan weight of halfedge ij in terms of the lengths of its
-// neighbors
-double halfedgeCotanWeight(double lij, double ljk, double lki);
 
 FaceData<Vector2> interpolateTangentVectorsB(const IntegerCoordinatesIntrinsicTriangulation& tri,
                                              const CommonSubdivision& cs, const FaceData<Vector2>& dataB);

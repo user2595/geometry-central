@@ -233,7 +233,8 @@ std::vector<Halfedge> FlipEdgePath::getHalfedgeList() {
 
 FlipEdgeNetwork::FlipEdgeNetwork(ManifoldSurfaceMesh& mesh_, IntrinsicGeometryInterface& inputGeom,
                                  const std::vector<std::vector<Halfedge>>& hePaths, VertexData<bool> extraMarkedVerts)
-    : tri(std::unique_ptr<SignpostIntrinsicTriangulation>(new SignpostIntrinsicTriangulation(mesh_, inputGeom))),
+    : tri(std::unique_ptr<IntegerCoordinatesIntrinsicTriangulation>(
+          new IntegerCoordinatesIntrinsicTriangulation(mesh_, inputGeom))),
       mesh(*(tri->intrinsicMesh)), pathsAtEdge(mesh), isMarkedVertex(mesh, false) {
 
 
@@ -525,35 +526,67 @@ double FlipEdgeNetwork::minAngleIsotopy() {
 
 std::tuple<double, double> FlipEdgeNetwork::measureSideAngles(Halfedge hePrev, Halfedge heNext) {
   Vertex v = heNext.vertex();
-  double s = tri->vertexAngleSums[v];
-
-  double angleIn = tri->signpostAngle[hePrev.twin()];
-  double angleOut = tri->signpostAngle[heNext];
-  bool isBoundary = v.isBoundary();
 
   // Compute right angle
-  double rightAngle;
-  if (angleIn < angleOut) {
-    rightAngle = angleOut - angleIn;
-  } else {
-    if (isBoundary) {
-      rightAngle = std::numeric_limits<double>::infinity();
-    } else {
-      rightAngle = (s - angleIn) + angleOut;
+  double rightAngle = 0;
+  {
+    Halfedge walkHe = hePrev;
+    while (walkHe.twin() != heNext) {
+      if (!walkHe.twin().isInterior()) {
+        // quit if we hit boundary
+        rightAngle = std::numeric_limits<double>::infinity();
+        break;
+      }
+      walkHe = walkHe.twin().next().next();
+      rightAngle += tri->getCornerAngle(walkHe.next().corner());
     }
   }
 
+
   // Compute left angle
-  double leftAngle;
-  if (angleOut < angleIn) {
-    leftAngle = angleIn - angleOut;
-  } else {
-    if (isBoundary) {
-      leftAngle = std::numeric_limits<double>::infinity();
-    } else {
-      leftAngle = (s - angleOut) + angleIn;
+  double leftAngle = 0;
+  {
+    Halfedge walkHe = hePrev;
+    while (walkHe.twin() != heNext) {
+      if (!walkHe.isInterior()) {
+        // quit if we hit boundary
+        leftAngle = std::numeric_limits<double>::infinity();
+        break;
+      }
+      walkHe = walkHe.next().twin();
+      leftAngle += tri->getCornerAngle(walkHe.twin().corner());
     }
   }
+
+  // double s = tri->vertexAngleSums[v];
+
+  // double angleIn = tri->signpostAngle[hePrev.twin()];
+  // double angleOut = tri->signpostAngle[heNext];
+  // bool isBoundary = v.isBoundary();
+
+  // // Compute right angle
+  // double rightAngle;
+  // if (angleIn < angleOut) {
+  //   rightAngle = angleOut - angleIn;
+  // } else {
+  //   if (isBoundary) {
+  //     rightAngle = std::numeric_limits<double>::infinity();
+  //   } else {
+  //     rightAngle = (s - angleIn) + angleOut;
+  //   }
+  // }
+
+  // // Compute left angle
+  // double leftAngle;
+  // if (angleOut < angleIn) {
+  //   leftAngle = angleIn - angleOut;
+  // } else {
+  //   if (isBoundary) {
+  //     leftAngle = std::numeric_limits<double>::infinity();
+  //   } else {
+  //     leftAngle = (s - angleOut) + angleIn;
+  //   }
+  // }
 
   return std::tuple<double, double>{leftAngle, rightAngle};
 }
@@ -851,9 +884,10 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
       // Gather values for the edge to be flipped
       Edge currEdge = sCurr.edge();
       double oldLen = tri->edgeLengths[currEdge]; // old values are used for rewinding
-      double oldAngleA = tri->signpostAngle[currEdge.halfedge()];
-      double oldAngleB = tri->signpostAngle[currEdge.halfedge().twin()];
-      bool oldIsOrig = tri->edgeIsOriginal[currEdge];
+      // TODO: put this back later
+      // double oldAngleA = tri->signpostAngle[currEdge.halfedge()];
+      // double oldAngleB = tri->signpostAngle[currEdge.halfedge().twin()];
+      // bool oldIsOrig = tri->edgeIsOriginal[currEdge];
 
       // Try to flip the edge. Note that flipping will only be possible iff \beta < \pi as in the formal algorithm
       // statement
@@ -864,7 +898,9 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
 
         // track data to support rewinding
         if (supportRewinding) {
-          rewindRecord.emplace_back(currEdge, oldLen, oldAngleA, oldAngleB, oldIsOrig);
+          GC_SAFETY_ASSERT(false,
+                           "Rewinding is currently broken [flip_geodesics.cpp > FlipEdgeNetwork::locallyShortenAt]");
+          // rewindRecord.emplace_back(currEdge, oldLen, oldAngleA, oldAngleB, oldIsOrig);
         }
 
         // Flip happened! Update data and continue processing
@@ -1152,9 +1188,9 @@ void FlipEdgeNetwork::splitPathsAlongInputEdges() {
       Halfedge currHe = std::get<0>(it.second);
       if (currHe == Halfedge()) continue;
 
-      // std::vector<double> intermediateCrossingTimes =
-      //     tri->recoverTraceTValues(tri->traceIntrinsicHalfedgeAlongInput(currHe));
-      std::vector<double> intermediateCrossingTimes{0, 0.5, 1};
+      std::vector<double> intermediateCrossingTimes =
+          tri->recoverTraceTValues(tri->traceIntrinsicHalfedgeAlongInput(currHe));
+      // std::vector<double> intermediateCrossingTimes{0, 0.5, 1};
       // std::cout << "intermediate crossings: " << std::endl;
       // for (const auto& q : tri->traceIntrinsicHalfedgeAlongInput(currHe)) {
       //   std::cout << "\t" << q << std::endl;
@@ -1402,7 +1438,8 @@ void FlipEdgeNetwork::rewind() {
 
     // Undo the flip
     // bool flipped = tri->flipEdgeIfPossible(edge, 0.);
-    tri->flipEdgeManual(edge, oldLen, oldAngleA, oldAngleB, isOrig, true);
+    // tri->flipEdgeManual(edge, oldLen, oldAngleA, oldAngleB, isOrig, true);
+    GC_SAFETY_ASSERT(false, "Rewinding is currently broken [flip_geodesics.cpp > FlipEdgeNetwork::rewind]");
   }
 }
 
@@ -1820,7 +1857,7 @@ void FlipEdgeNetwork::savePathOBJLine(std::string filenamePrefix, bool withAll) 
 
 bool FlipEdgeNetwork::intrinsicTriIsOriginal() {
   for (Edge e : mesh.edges()) {
-    if (!tri->edgeIsOriginal[e]) {
+    if (!tri->checkEdgeOriginal(e)) {
       return false;
     }
   }
@@ -1937,10 +1974,11 @@ void FlipEdgeNetwork::updatePathAfterEdgeSplit(Halfedge origHe, Halfedge newHeFr
   pushOutsideSegment(newSegHe, newSeg);
 
 
-  addToWedgeAngleQueue(pathSeg); // spliting the edge probably changed computed angle by numerical epsilon
+  // TODO: put this back in
+  // addToWedgeAngleQueue(pathSeg); // spliting the edge probably changed computed angle by numerical epsilon
   // NOTE: shouldn't need to add to wedge angle queue for straightening, the newly created wedge is straight, since
   // it's a subdivided (geodesic) edge, but do so anyway to think less about numerics
-  addToWedgeAngleQueue(newSeg);
+  // addToWedgeAngleQueue(newSeg);
 
   // validate();
 }
