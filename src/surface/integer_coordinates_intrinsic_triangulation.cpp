@@ -1320,7 +1320,13 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Halfedge he
     updateHalfedgeVectorsInVertex(newVertex);
 
     triangulationChanged();
-    invokeEdgeSplitCallbacks(e, newHalfedge, newHalfedge.next().next().twin().next().next().twin());
+
+    Halfedge otherNewHalfedge = newHalfedge.next().next().twin().next().next().twin();
+    if (e == he.edge()) {
+      invokeEdgeSplitCallbacks(e, newHalfedge, otherNewHalfedge);
+    } else {
+      invokeEdgeSplitCallbacks(e, otherNewHalfedge, newHalfedge);
+    }
 
     return newHalfedge;
   }
@@ -1512,7 +1518,13 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he
   updateHalfedgeVectorsInVertex(newVertex);
 
   triangulationChanged();
-  invokeEdgeSplitCallbacks(e, newHalfedge, newHalfedge.next().next().twin().next().next().twin());
+
+  Halfedge otherNewHalfedge = newHalfedge.next().next().twin().next().next().twin();
+  if (e == he.edge()) {
+    invokeEdgeSplitCallbacks(e, newHalfedge, otherNewHalfedge);
+  } else {
+    invokeEdgeSplitCallbacks(e, otherNewHalfedge, newHalfedge);
+  }
 
   return newHalfedge;
   // }
