@@ -103,6 +103,8 @@ public:
   // the edges connecting this new point to f's vertices.
   std::pair<SurfacePoint, std::array<int, 3>> computeFaceSplitData(Face f, Vector3 bary, bool verbose = false);
 
+  SurfacePoint equivalentPointOnInput(Halfedge he, double tBary);
+
   // Compute the number of vertices in the common subdivision
   // i.e. intrinsicMesh->nVertices() plus the sum of the normal coordinates
   size_t nSubdividedVertices() const;

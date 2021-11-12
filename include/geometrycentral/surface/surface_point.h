@@ -52,6 +52,10 @@ struct SurfacePoint {
   // on or adjacent to the requested face, throws an error.
   inline SurfacePoint inFace(Face f) const;
 
+  // Returns the surface point as an edge point in edge e. If the the SurfacePoint is not on the edge or one of its
+  // adjacent vertices, throws an error
+  inline SurfacePoint inEdge(Edge e) const;
+
   // Return the nearest vertex to this surface point
   inline Vertex nearestVertex() const;
 

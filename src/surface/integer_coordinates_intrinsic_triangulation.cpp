@@ -174,8 +174,7 @@ SurfacePoint IntegerCoordinatesIntrinsicTriangulation::equivalentPointOnInput(co
   case SurfacePointType::Vertex:
     return vertexLocations[pointOnIntrinsic.vertex];
   case SurfacePointType::Edge: {
-    SurfacePoint facePoint = pointOnIntrinsic.inSomeFace();
-    return computeFaceSplitData(facePoint.face, facePoint.faceCoords).first;
+    return equivalentPointOnInput(pointOnIntrinsic.edge.halfedge(), pointOnIntrinsic.tEdge);
   }
   case SurfacePointType::Face:
     return computeFaceSplitData(pointOnIntrinsic.face, pointOnIntrinsic.faceCoords).first;
@@ -711,7 +710,7 @@ IntegerCoordinatesIntrinsicTriangulation::computeFaceSplitData(Face f, Vector3 b
     std::array<std::vector<std::vector<std::pair<SurfacePoint, double>>>, 3> geodesics;
     std::array<std::vector<double>, 3> transverseCrossingTimes;
     std::array<std::vector<double>, 3> boundaryCrossings;
-    std::array<std::vector<size_t>, 3> crossingID;
+    std::array<std::vector<size_t>, 3> crossingID; // Where along the curve is the crossing with our halfedge he?
     for (Halfedge he : f.adjacentHalfedges()) {
       for (int ind = 0; ind < normalCoordinates[he.edge()]; ind++) {
 
@@ -1052,6 +1051,104 @@ IntegerCoordinatesIntrinsicTriangulation::computeFaceSplitData(Face f, Vector3 b
   return {SurfacePoint(insertionFace, insertionBary), counts};
 }
 
+SurfacePoint IntegerCoordinatesIntrinsicTriangulation::equivalentPointOnInput(Halfedge he, double tBary) {
+
+  if (normalCoordinates[he.edge()] > 0) {
+    // If there are crossings along this edge, we have to determine where they are
+
+    // Find information about crossings along he. Logic copied in computeFaceSplitData
+    std::vector<NormalCoordinatesCurve> curves;
+    std::vector<std::vector<std::pair<SurfacePoint, double>>> geodesics;
+    std::vector<double> transverseCrossingTimes;
+    std::vector<double> heCrossingTimes;
+    std::vector<size_t> crossingID; // Where along the curve is the crossing with our halfedge he?
+    for (int ind = 0; ind < normalCoordinates[he.edge()]; ind++) {
+      // Get the topological crossings for the curve
+      NormalCoordinatesCurve crossings;
+      int centerCrossInd;
+      std::tie(crossings, centerCrossInd) = normalCoordinates.topologicalTraceBidirectional(he, ind);
+
+      curves.push_back(crossings);
+      geodesics.push_back(generateFullSingleGeodesicGeometry(*intrinsicMesh, *this, crossings));
+      std::vector<std::pair<SurfacePoint, double>>& geodesic = geodesics.back();
+      SurfacePoint& thisCross = geodesic[centerCrossInd + 1].first;
+      double tCross = (he.edge().halfedge() == he) ? thisCross.tEdge : 1 - thisCross.tEdge;
+      heCrossingTimes.push_back(tCross);
+      transverseCrossingTimes.push_back(geodesic[centerCrossInd + 1].second);
+      crossingID.push_back(centerCrossInd + 1);
+    }
+
+    int crossingSegment = normalCoordinates[he.edge()];
+    for (int iSeg = 0; iSeg < normalCoordinates[he.edge()]; iSeg++) {
+      if (heCrossingTimes[iSeg] > tBary) {
+        crossingSegment = iSeg;
+        break;
+      }
+    }
+
+    SurfacePoint segmentTail, segmentTip;
+    double tSegmentTail, tSegmentTip;
+    if (crossingSegment == 0) {
+      segmentTail = vertexLocations[he.tailVertex()];
+      tSegmentTail = 0;
+    } else {
+      Halfedge tailHedge = identifyInputEdge(curves[crossingSegment - 1]);
+      segmentTail = SurfacePoint(tailHedge, transverseCrossingTimes[crossingSegment - 1]);
+      tSegmentTail = heCrossingTimes[crossingSegment - 1];
+    }
+
+    if (crossingSegment == normalCoordinates[he.edge()]) {
+      segmentTip = vertexLocations[he.tipVertex()];
+      tSegmentTip = 1;
+    } else {
+      Halfedge tipHedge = identifyInputEdge(curves[crossingSegment]);
+      segmentTip = SurfacePoint(tipHedge, transverseCrossingTimes[crossingSegment]);
+      tSegmentTip = heCrossingTimes[crossingSegment];
+    }
+
+    double tBarySegment = (tBary - tSegmentTail) / (tSegmentTip - tSegmentTail);
+    Face inputFace = sharedFace(segmentTail, segmentTip);
+    Vector3 segmentTailCoords = segmentTail.inFace(inputFace).faceCoords;
+    Vector3 segmentTipCoords = segmentTip.inFace(inputFace).faceCoords;
+
+    return SurfacePoint(inputFace, (1 - tBarySegment) * segmentTailCoords + tBarySegment * segmentTipCoords);
+
+  } else if (normalCoordinates[he.edge()] < 0) {
+    // If this is a shared edge, return a point on the shared edge
+
+    SurfacePoint tail = vertexLocations[he.tailVertex()];
+    SurfacePoint tip = vertexLocations[he.tipVertex()];
+
+    Edge inputEdge;
+    if (tail.type == SurfacePointType::Edge) {
+      inputEdge = tail.edge;
+    } else if (tip.type == SurfacePointType::Edge) {
+      inputEdge = tip.edge;
+    } else {
+      inputEdge = getSharedInputEdge(he).edge();
+    }
+
+    double tTail = tail.inEdge(inputEdge).tEdge;
+    double tTip = tip.inEdge(inputEdge).tEdge;
+
+    return SurfacePoint(inputEdge, (1 - tBary) * tTail + tBary * tTip);
+  } else {
+    // The normal coordinate must be 0, meaning both endpoints are contained in a common face of the input mesh
+
+    SurfacePoint tail = vertexLocations[he.tailVertex()];
+    SurfacePoint tip = vertexLocations[he.tipVertex()];
+
+    Face inputFace = sharedFace(tail, tip);
+    SurfacePoint tailInFace = tail.inFace(inputFace);
+    SurfacePoint tipInFace = tip.inFace(inputFace);
+
+    Vector3 tailCoords = tailInFace.faceCoords;
+    Vector3 tipCoords = tipInFace.faceCoords;
+
+    return SurfacePoint(inputFace, (1 - tBary) * tailCoords + tBary * tipCoords);
+  }
+}
+
 Vertex IntegerCoordinatesIntrinsicTriangulation::insertVertex(SurfacePoint pt) {
   Vertex newVertex;
   switch (pt.type) {
@@ -1142,25 +1239,6 @@ Vertex IntegerCoordinatesIntrinsicTriangulation::splitEdge(Edge e, double bary, 
 
 Halfedge IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Halfedge he, double bary, bool verbose) {
   Edge e = he.edge();
-  auto inEdge = [](Edge e, SurfacePoint p) -> SurfacePoint {
-    switch (p.type) {
-    case SurfacePointType::Vertex:
-      if (p.vertex == e.halfedge().tailVertex()) {
-        return SurfacePoint(e, 0);
-      } else if (p.vertex == e.halfedge().tipVertex()) {
-        return SurfacePoint(e, 1);
-      }
-      break;
-    case SurfacePointType::Edge:
-      if (p.edge == e) {
-        return p;
-      }
-      break;
-    default:
-      break;
-    }
-    throw std::runtime_error("SurfacePoint not in edge");
-  };
 
   auto heBary = [&](Halfedge he, double t) -> Vector3 {
     int i = halfedgeIndexInTriangle(he);
@@ -1249,8 +1327,8 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Halfedge he
       inputEdge = getSharedInputEdge(he).edge();
     }
 
-    double tSrc = inEdge(inputEdge, src).tEdge;
-    double tDst = inEdge(inputEdge, dst).tEdge;
+    double tSrc = src.inEdge(inputEdge).tEdge;
+    double tDst = dst.inEdge(inputEdge).tEdge;
 
     double tInsertion = (1 - bary) * tSrc + bary * tDst;
 
@@ -1334,25 +1412,6 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Halfedge he
 
 Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he, double bary, bool verbose) {
   Edge e = he.edge();
-  auto inEdge = [](Edge e, SurfacePoint p) -> SurfacePoint {
-    switch (p.type) {
-    case SurfacePointType::Vertex:
-      if (p.vertex == e.halfedge().tailVertex()) {
-        return SurfacePoint(e, 0);
-      } else if (p.vertex == e.halfedge().tipVertex()) {
-        return SurfacePoint(e, 1);
-      }
-      break;
-    case SurfacePointType::Edge:
-      if (p.edge == e) {
-        return p;
-      }
-      break;
-    default:
-      break;
-    }
-    throw std::runtime_error("SurfacePoint not in edge");
-  };
 
   auto heBary = [&](Halfedge he, double t) -> Vector3 {
     int i = halfedgeIndexInTriangle(he);
@@ -1372,7 +1431,8 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he
 
   SurfacePoint inputPoint;
   if (normalCoordinates[e] >= 0) {
-    inputPoint = equivalentPointOnInput(SurfacePoint(he, bary));
+    // inputPoint = equivalentPointOnInput(SurfacePoint(he, bary));
+    inputPoint = equivalentPointOnInput(he, bary);
   } else {
     Edge inputEdge;
     SurfacePoint src = vertexLocations[he.tailVertex()];
@@ -1386,8 +1446,8 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he
       inputEdge = getSharedInputEdge(he).edge();
     }
 
-    double tSrc = inEdge(inputEdge, src).tEdge;
-    double tDst = inEdge(inputEdge, dst).tEdge;
+    double tSrc = src.inEdge(inputEdge).tEdge;
+    double tDst = dst.inEdge(inputEdge).tEdge;
 
     double tInsertion = (1 - bary) * tSrc + bary * tDst;
 
