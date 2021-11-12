@@ -1139,6 +1139,13 @@ SurfacePoint IntegerCoordinatesIntrinsicTriangulation::equivalentPointOnInput(Ha
     SurfacePoint tip = vertexLocations[he.tipVertex()];
 
     Face inputFace = sharedFace(tail, tip);
+    if (inputFace == Face()) {
+      std::cout << he << " | normal coord: " << normalCoordinates[he.edge()] << std::endl;
+      std::cout << "Time to figure out what's going on" << std::endl;
+      std::cout << "tail: " << tail << std::endl;
+      std::cout << "tip: " << tip << std::endl;
+    }
+    GC_SAFETY_ASSERT(inputFace != Face(), "edge split err. Couldn't find shared parent face");
     SurfacePoint tailInFace = tail.inFace(inputFace);
     SurfacePoint tipInFace = tip.inFace(inputFace);
 
