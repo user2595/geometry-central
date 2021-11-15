@@ -49,7 +49,7 @@ public:
 
   // Count of edges emanating from each corner (nonnegative)
   VertexData<int> roundaboutDegrees;
-  
+
   // === Initialization
   void setCurvesFromEdges(ManifoldSurfaceMesh& mesh);
 
@@ -80,6 +80,9 @@ public:
 
   std::array<int, 3> computeBoundaryEdgeSplitDataGeodesic(IntrinsicGeometryInterface& geo, Edge e, double location);
 
+  // Compute the new normal coordinates after splitting edge e
+  // Edge e is split at segment iSeg, where 0 <= iSeg <= edgeCoords[e]
+  std::array<int, 4> computeInteriorEdgeSplitDataCombinatorial(IntrinsicGeometryInterface& geo, Edge e, size_t iSeg);
 
   // Check that these are valid normal coordinates, throw if not
   void validate() const;

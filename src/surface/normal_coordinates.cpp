@@ -233,6 +233,46 @@ std::array<int, 4> NormalCoordinates::computeInteriorEdgeSplitDataGeodesic(Intri
   }
 }
 
+std::array<int, 4> NormalCoordinates::computeInteriorEdgeSplitDataCombinatorial(IntrinsicGeometryInterface& geo, Edge e,
+                                                                                size_t iSeg) {
+  if (edgeCoords[e] > 0) {
+    std::vector<double> eCrossings = generateGeodesicCrossingLocations(geo, e.halfedge());
+
+    int n2 = edgeCoords[e] - iSeg;
+    int n4 = iSeg;
+
+    Corner ck = e.halfedge().next().next().corner();
+    Corner cl = e.halfedge().twin().next().next().corner();
+
+    int n1 = 0;
+    n1 += positivePart(strictCornerCoord(e.halfedge().twin().corner()) - positivePart(n2));
+    n1 += positivePart(strictCornerCoord(e.halfedge().twin().next().corner()) - positivePart(n4));
+    n1 += strictCornerCoord(cl);
+    n1 += strictDegree(e.halfedge().twin().corner());
+    n1 += strictDegree(e.halfedge().twin().next().corner());
+
+    int n3 = 0;
+    n3 += positivePart(strictCornerCoord(e.halfedge().next().corner()) - positivePart(n2));
+    n3 += positivePart(strictCornerCoord(e.halfedge().corner()) - positivePart(n4));
+    n3 += strictCornerCoord(ck);
+    n3 += strictDegree(e.halfedge().corner());
+    n3 += strictDegree(e.halfedge().next().corner());
+
+    return {n1, n2, n3, n4};
+  } else {
+    int nil = edgeCoords[e.halfedge().twin().next().edge()];
+    int nlj = edgeCoords[e.halfedge().twin().next().next().edge()];
+    int njk = edgeCoords[e.halfedge().next().edge()];
+    int nki = edgeCoords[e.halfedge().next().next().edge()];
+
+    int n1 = fmax(nil, fmax(nlj, 0));
+    int n2 = edgeCoords[e];
+    int n3 = fmax(njk, fmax(nki, 0));
+    int n4 = edgeCoords[e];
+    return {n1, n2, n3, n4};
+  }
+}
+
 std::array<int, 3> NormalCoordinates::computeBoundaryEdgeSplitDataGeodesic(IntrinsicGeometryInterface& geo, Edge e,
                                                                            double location) {
 

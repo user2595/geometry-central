@@ -103,7 +103,9 @@ public:
   // the edges connecting this new point to f's vertices.
   std::pair<SurfacePoint, std::array<int, 3>> computeFaceSplitData(Face f, Vector3 bary, bool verbose = false);
 
-  SurfacePoint equivalentPointOnInput(Halfedge he, double tBary);
+  // Computes the corresponding point on the input mesh, as well as which segment the point belongs to.
+  // The segment is specified by an integer 0 <= segmentIndex <= normalCoordinates[he.edge()]
+  std::pair<SurfacePoint, size_t> computeEdgeSplitData(Halfedge he, double tBary);
 
   // Compute the number of vertices in the common subdivision
   // i.e. intrinsicMesh->nVertices() plus the sum of the normal coordinates

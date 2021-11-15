@@ -174,7 +174,7 @@ SurfacePoint IntegerCoordinatesIntrinsicTriangulation::equivalentPointOnInput(co
   case SurfacePointType::Vertex:
     return vertexLocations[pointOnIntrinsic.vertex];
   case SurfacePointType::Edge: {
-    return equivalentPointOnInput(pointOnIntrinsic.edge.halfedge(), pointOnIntrinsic.tEdge);
+    return computeEdgeSplitData(pointOnIntrinsic.edge.halfedge(), pointOnIntrinsic.tEdge).first;
   }
   case SurfacePointType::Face:
     return computeFaceSplitData(pointOnIntrinsic.face, pointOnIntrinsic.faceCoords).first;
@@ -1051,7 +1051,8 @@ IntegerCoordinatesIntrinsicTriangulation::computeFaceSplitData(Face f, Vector3 b
   return {SurfacePoint(insertionFace, insertionBary), counts};
 }
 
-SurfacePoint IntegerCoordinatesIntrinsicTriangulation::equivalentPointOnInput(Halfedge he, double tBary) {
+std::pair<SurfacePoint, size_t> IntegerCoordinatesIntrinsicTriangulation::computeEdgeSplitData(Halfedge he,
+                                                                                               double tBary) {
 
   if (normalCoordinates[he.edge()] > 0) {
     // If there are crossings along this edge, we have to determine where they are
@@ -1111,7 +1112,9 @@ SurfacePoint IntegerCoordinatesIntrinsicTriangulation::equivalentPointOnInput(Ha
     Vector3 segmentTailCoords = segmentTail.inFace(inputFace).faceCoords;
     Vector3 segmentTipCoords = segmentTip.inFace(inputFace).faceCoords;
 
-    return SurfacePoint(inputFace, (1 - tBarySegment) * segmentTailCoords + tBarySegment * segmentTipCoords);
+    return std::make_pair(
+        SurfacePoint(inputFace, (1 - tBarySegment) * segmentTailCoords + tBarySegment * segmentTipCoords),
+        crossingSegment);
 
   } else if (normalCoordinates[he.edge()] < 0) {
     // If this is a shared edge, return a point on the shared edge
@@ -1131,7 +1134,7 @@ SurfacePoint IntegerCoordinatesIntrinsicTriangulation::equivalentPointOnInput(Ha
     double tTail = tail.inEdge(inputEdge).tEdge;
     double tTip = tip.inEdge(inputEdge).tEdge;
 
-    return SurfacePoint(inputEdge, (1 - tBary) * tTail + tBary * tTip);
+    return std::make_pair(SurfacePoint(inputEdge, (1 - tBary) * tTail + tBary * tTip), 0);
   } else {
     // The normal coordinate must be 0, meaning both endpoints are contained in a common face of the input mesh
 
@@ -1152,7 +1155,7 @@ SurfacePoint IntegerCoordinatesIntrinsicTriangulation::equivalentPointOnInput(Ha
     Vector3 tailCoords = tailInFace.faceCoords;
     Vector3 tipCoords = tipInFace.faceCoords;
 
-    return SurfacePoint(inputFace, (1 - tBary) * tailCoords + tBary * tipCoords);
+    return std::make_pair(SurfacePoint(inputFace, (1 - tBary) * tailCoords + tBary * tipCoords), 0);
   }
 }
 
@@ -1420,8 +1423,10 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Halfedge he
 Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he, double bary, bool verbose) {
   Edge e = he.edge();
 
-  std::cout << "Splitting halfedge " << he << " | " << he.tailVertex() << " -> " << he.tipVertex() << "  at  " << bary
-            << std::endl;
+  // verbose |= (he.getIndex() == 61363);
+  if (verbose)
+    std::cout << "Splitting halfedge " << he << " | " << he.tailVertex() << " -> " << he.tipVertex() << "  at  " << bary
+              << std::endl;
 
   auto heBary = [&](Halfedge he, double t) -> Vector3 {
     int i = halfedgeIndexInTriangle(he);
@@ -1440,10 +1445,13 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he
   };
 
   SurfacePoint inputPoint;
+  size_t iSeg = 0;
   if (normalCoordinates[e] >= 0) {
+    if (verbose) std::cout << "     first" << std::endl;
     // inputPoint = equivalentPointOnInput(SurfacePoint(he, bary));
-    inputPoint = equivalentPointOnInput(he, bary);
+    std::tie(inputPoint, iSeg) = computeEdgeSplitData(he, bary);
   } else {
+    if (verbose) std::cout << "     2nd" << std::endl;
     Edge inputEdge;
     SurfacePoint src = vertexLocations[he.tailVertex()];
     SurfacePoint dst = vertexLocations[he.tipVertex()];
@@ -1462,71 +1470,16 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he
     double tInsertion = (1 - bary) * tSrc + bary * tDst;
 
     inputPoint = SurfacePoint(inputEdge, tInsertion);
+    iSeg = 0;
   }
 
-  /*
-  if (normalCoordinates[e] >= 0) {
-    if (verbose) std::cout << "Easy Edge Split" << std::endl;
-    // Easy case - edge not shared
-    // TODO: use normal coordinate edge split code explicitly - it
-    // needs fewer geodesic crossing points
+  // fix orientation
+  if (he != e.halfedge()) iSeg = normalCoordinates[e] - iSeg;
 
-    // Vertex vTipBefore = he.tipVertex();
-    // Vertex vTailBefore = he.tailVertex();
-    // bool fixedBefore = isFixed(e);
+  if (verbose) std::cout << "  inputPoint: " << inputPoint << "\tiSeg: " << iSeg << std::endl;
 
-    std::array<int, 4> newNormalCoordinates = normalCoordinates.computeInteriorEdgeSplitDataGeodesic(*this, e, bary);
-
-    // "edge 2"
-    Halfedge newHalfedge = intrinsicMesh->splitEdgeTriangular(e); // TODO: use mutation Manager
-    Vertex newVertex = newHalfedge.vertex();
-    vertexLocations[newVertex] = inputPoint;
-
-    // // Vertex newVertex = splitFace(he.face(), heBary(he, bary));
-    // bool flipHappened = flipEdgeIfPossible(e);
-
-    // if (!flipHappened) throw std::runtime_error("pos-split flip failed!");
-
-    // // Find two of the halfedges that together make up the old edge
-    // Halfedge newHalfedge = he.prevOrbitFace().twin();
-    // Halfedge otherNewHalfedge = newHalfedge.next().next().twin().next().next().twin();
-
-
-    // Update is-fixed array
-    // nsharp: don't need, we keep updated with edge split callback
-    // if (fixedBefore) {
-    // isFixed[newHalfedge.edge()] = true;
-    // isFixed[otherNewHalfedge.edge()] = true;
-    //}
-
-    size_t iE = 1; // TODO: fix indexing convention
-    for (Halfedge he : newVertex.outgoingHalfedges()) {
-      Edge e = he.edge();
-
-      edgeLengths[e] = newEdgeLengths[iE];
-      normalCoordinates.edgeCoords[e] = newNormalCoordinates[iE];
-
-      // nsharp: don't need this, managed by callback
-      // if (!isFixed[e] && newEdgeFixed[iE]) {
-      // isFixed[e] = true;
-      //// fixedEdges.push_back(e);
-      //} else if (isFixed[e] && !newEdgeFixed[iE]) {
-      // throw std::runtime_error("Need to remove e from the fixed list");
-      //}
-
-      // indexing goes counterclockwise, but loop goes clockwise
-      iE = (iE + 3) % 4;
-    }
-
-    triangulationChanged();
-    invokeEdgeSplitCallbacks(e, newHalfedge, otherNewHalfedge);
-
-    return newHalfedge;
-
-  } else {
-  if (verbose) std::cout << "Shared Edge Split" << std::endl; */
-  // Hard case - edge also exists in input mesh
-  std::array<int, 4> newNormalCoordinates = normalCoordinates.computeInteriorEdgeSplitDataGeodesic(*this, e, bary);
+  // std::array<int, 4> newNormalCoordinates = normalCoordinates.computeInteriorEdgeSplitDataGeodesic(*this, e, bary);
+  std::array<int, 4> newNormalCoordinates = normalCoordinates.computeInteriorEdgeSplitDataCombinatorial(*this, e, iSeg);
 
   // Compute new edge lengths
   double oldLen = edgeLengths[e];
