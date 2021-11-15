@@ -1420,6 +1420,9 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Halfedge he
 Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he, double bary, bool verbose) {
   Edge e = he.edge();
 
+  std::cout << "Splitting halfedge " << he << " | " << he.tailVertex() << " -> " << he.tipVertex() << "  at  " << bary
+            << std::endl;
+
   auto heBary = [&](Halfedge he, double t) -> Vector3 {
     int i = halfedgeIndexInTriangle(he);
     int j = (i + 1) % 3;

@@ -1904,6 +1904,9 @@ void FlipPathSegment::splitEdge(double tSplit) {
   Halfedge origHe = he;
 
   Halfedge newHeFront = path->network.tri->splitEdge(he, tSplit);
+  // Vertex newVertex = newHeFront.vertex();
+  // path->network.tri->vertexLocations[newVertex] = clampToSimplex(path->network.tri->vertexLocations[newVertex],
+  // 1e-2);
   path->network.updatePathAfterEdgeSplit(origHe, newHeFront);
 }
 

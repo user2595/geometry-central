@@ -294,10 +294,9 @@ std::vector<double> IntrinsicTriangulation::recoverTraceTValues(const std::vecto
   // Walk along the curve, measuring the length of each segment from its barcentric coordinates and the geometry of the
   // underlying triangulation
   tVals[0] = 0.;
-  tVals[tVals.size() - 1] = 1.;
-  for (size_t iP = 1; iP + 1 < edgeTrace.size(); iP++) {
-    SurfacePoint prev = edgeTrace[iP - 1];
-    SurfacePoint next = edgeTrace[iP];
+  for (size_t iP = 0; iP + 1 < edgeTrace.size(); iP++) {
+    SurfacePoint prev = edgeTrace[iP];
+    SurfacePoint next = edgeTrace[iP + 1];
     Face f = sharedFace(prev, next);
     prev = prev.inFace(f);
     next = next.inFace(f);
@@ -306,7 +305,7 @@ std::vector<double> IntrinsicTriangulation::recoverTraceTValues(const std::vecto
                             inputGeom.edgeLengths[f.halfedge().next().next().edge()]};
     Vector3 disp = next.faceCoords - prev.faceCoords;
     double len = displacementLength(disp, triangleLengths);
-    tVals[iP] = tVals[iP - 1] + len;
+    tVals[iP + 1] = tVals[iP] + len;
   }
 
   // normalize to [0,1]
