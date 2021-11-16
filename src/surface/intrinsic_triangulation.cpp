@@ -702,7 +702,6 @@ void IntrinsicTriangulation::updateFaceBasis(Face f) {
 CommonSubdivision& IntrinsicTriangulation::getCommonSubdivision() {
   if (!commonSubdivision) {
     constructCommonSubdivision();
-    std::cout << "constructed common subdivision!" << std::endl;
   }
   return *commonSubdivision;
 }

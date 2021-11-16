@@ -877,7 +877,8 @@ std::vector<SurfacePoint> generateSingleGeodesicGeometry(ManifoldSurfaceMesh& me
 // Barycentric coordinates are 0 at the src of and edge and 1 at the dst
 std::vector<std::pair<SurfacePoint, double>> generateFullSingleGeodesicGeometry(ManifoldSurfaceMesh& mesh,
                                                                                 IntrinsicGeometryInterface& geo,
-                                                                                const NormalCoordinatesCurve& curve) {
+                                                                                const NormalCoordinatesCurve& curve,
+                                                                                bool verbose) {
 
   // == Compute a geodesic path by laying the triangle strip that the path
   // passes through out in the plane
@@ -1012,6 +1013,14 @@ std::vector<std::pair<SurfacePoint, double>> generateFullSingleGeodesicGeometry(
   Halfedge heEnd = std::get<1>(curve.crossings[curve.crossings.size() - 1]);
   SurfacePoint vEnd(heEnd.twin().next().next().vertex());
 
+  if (verbose) {
+    std::cout << "start: " << start << std::endl;
+    for (const auto& positions : edgePositions) {
+      std::cout << "  " << positions[0] << "   |   " << positions[1] << std::endl;
+    }
+    std::cout << "end: " << start << std::endl;
+  }
+
   std::vector<std::pair<SurfacePoint, double>> embeddedCurve{std::make_pair(vStart, 0)};
 
   for (size_t iC = 0; iC < curve.crossings.size(); ++iC) {
@@ -1022,10 +1031,17 @@ std::vector<std::pair<SurfacePoint, double>> generateFullSingleGeodesicGeometry(
     double tA = intersection.tA;
     double tB = intersection.tB;
 
+    if (verbose) {
+      std::cout << tA << ", " << tB << std::endl;
+    }
+
     tA = clamp(tA, 0., 1.);
     tB = clamp(tB, 0., 1.);
 
     embeddedCurve.push_back(std::make_pair(SurfacePoint{he, tA}, tB));
+  }
+  if (verbose) {
+    std::cout << std::endl;
   }
 
   embeddedCurve.push_back(std::make_pair(vEnd, 1));

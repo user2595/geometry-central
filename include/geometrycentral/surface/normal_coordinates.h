@@ -203,7 +203,8 @@ std::vector<SurfacePoint> generateSingleGeodesicGeometry(ManifoldSurfaceMesh& me
 // Barycentric coordinates are 0 at the src of and edge and 1 at the dst
 std::vector<std::pair<SurfacePoint, double>> generateFullSingleGeodesicGeometry(ManifoldSurfaceMesh& mesh,
                                                                                 IntrinsicGeometryInterface& geo,
-                                                                                const NormalCoordinatesCurve& curve);
+                                                                                const NormalCoordinatesCurve& curve,
+                                                                                bool verbose = false);
 
 // Compute the new normal coordinates for an inserted vertex v in face f given
 // that v's barycentric coordinates and the barycentric coordinates of the

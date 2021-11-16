@@ -1077,6 +1077,15 @@ std::pair<SurfacePoint, size_t> IntegerCoordinatesIntrinsicTriangulation::comput
       heCrossingTimes.push_back(tCross);
       transverseCrossingTimes.push_back(geodesic[centerCrossInd + 1].second);
       crossingID.push_back(centerCrossInd + 1);
+
+      // Halfedge inputHedge = identifyInputEdge(curves.back());
+      // std::cout << "\t\t\t crossing [input]: " << SurfacePoint(inputHedge, transverseCrossingTimes.back())
+      //           << "\t[intrinsic]: " << thisCross << std::endl;
+      // std::cout << "\t\t\t\t (from curve): ";
+      // for (const auto combinatorialPoint : curves.back().crossings)
+      //   std::cout << "(" << combinatorialPoint.first << ", " << combinatorialPoint.second << "), ";
+      // std::cout << std::endl;
+      // generateFullSingleGeodesicGeometry(*intrinsicMesh, *this, crossings, true);
     }
 
     int crossingSegment = normalCoordinates[he.edge()];
@@ -1423,7 +1432,7 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Halfedge he
 Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he, double bary, bool verbose) {
   Edge e = he.edge();
 
-  // verbose |= (he.getIndex() == 51146);
+  // verbose |= (he.getIndex() == 51146) || true;
   if (verbose)
     std::cout << "Splitting halfedge " << he << " | " << he.tailVertex() << " -> " << he.tipVertex() << "  at  " << bary
               << std::endl;
@@ -1474,19 +1483,26 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he
   }
 
   // fix orientation
-  if (he != e.halfedge()) iSeg = normalCoordinates[e] - iSeg;
+  if (he != e.halfedge()) {
+    bary = 1 - bary;
+    iSeg = normalCoordinates[e] - iSeg;
+  }
 
   if (verbose) std::cout << "  inputPoint: " << inputPoint << "\tiSeg: " << iSeg << std::endl;
 
   // std::array<int, 4> newNormalCoordinates = normalCoordinates.computeInteriorEdgeSplitDataGeodesic(*this, e, bary);
   std::array<int, 4> newNormalCoordinates = normalCoordinates.computeInteriorEdgeSplitDataCombinatorial(*this, e, iSeg);
+  if (verbose)
+    std::cout << "  newNormalCoordinates: " << newNormalCoordinates[0] << ", " << newNormalCoordinates[1] << ", "
+              << newNormalCoordinates[2] << ", " << newNormalCoordinates[3] << std::endl;
 
   // Compute new edge lengths
   double oldLen = edgeLengths[e];
   std::array<double, 4> newEdgeLengths{0, (1 - bary) * oldLen, 0, bary * oldLen};
-  newEdgeLengths[0] =
-      displacementLength(heBary(he.twin(), 1 - bary) - heBary(he.twin().next(), 1), faceEdgeLengths(he.twin().face()));
-  newEdgeLengths[2] = displacementLength(heBary(he, bary) - heBary(he.next(), 1), faceEdgeLengths(he.face()));
+  newEdgeLengths[0] = displacementLength(heBary(e.halfedge().twin(), 1 - bary) - heBary(e.halfedge().twin().next(), 1),
+                                         faceEdgeLengths(e.halfedge().twin().face()));
+  newEdgeLengths[2] = displacementLength(heBary(e.halfedge(), bary) - heBary(e.halfedge().next(), 1),
+                                         faceEdgeLengths(e.halfedge().face()));
 
   std::array<bool, 4> newEdgeFixed{false, isFixed(e), false, isFixed(e)};
 
@@ -1494,6 +1510,20 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he
   Halfedge newHalfedge = intrinsicMesh->splitEdgeTriangular(e); // TODO: use mutation Manager
   Vertex newVertex = newHalfedge.vertex();
   vertexLocations[newVertex] = inputPoint;
+
+  if (verbose) {
+    auto faceString = [&](Face f) -> std::string {
+      std::string name = "{";
+      for (Vertex v : f.adjacentVertices()) {
+        name += std::to_string(v.getIndex());
+        name += ", ";
+      }
+      name += "}";
+      return name;
+    };
+    std::cout << "Inserted new vertex " << newVertex << ". The adjacent faces are: " << std::endl;
+    for (Face f : newVertex.adjacentFaces()) std::cout << "\t" << f << " " << faceString(f) << std::endl;
+  }
 
   // TODO: write applyVertexInsertionData in NormalCoordinates
   // class
@@ -1545,12 +1575,11 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he
   Halfedge otherNewHalfedge = newHalfedge.next().next().twin().next().next().twin();
   if (e == he.edge()) {
     invokeEdgeSplitCallbacks(e, newHalfedge, otherNewHalfedge);
+    return newHalfedge;
   } else {
     invokeEdgeSplitCallbacks(e, otherNewHalfedge, newHalfedge);
+    return otherNewHalfedge;
   }
-
-  return newHalfedge;
-  // }
 }
 
 Face IntegerCoordinatesIntrinsicTriangulation::removeInsertedVertex(Vertex v) {
