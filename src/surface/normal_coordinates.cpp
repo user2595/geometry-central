@@ -236,8 +236,6 @@ std::array<int, 4> NormalCoordinates::computeInteriorEdgeSplitDataGeodesic(Intri
 std::array<int, 4> NormalCoordinates::computeInteriorEdgeSplitDataCombinatorial(IntrinsicGeometryInterface& geo, Edge e,
                                                                                 size_t iSeg) {
   if (edgeCoords[e] > 0) {
-    std::vector<double> eCrossings = generateGeodesicCrossingLocations(geo, e.halfedge());
-
     int n2 = edgeCoords[e] - iSeg;
     int n4 = iSeg;
 
