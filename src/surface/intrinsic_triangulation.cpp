@@ -300,9 +300,11 @@ std::vector<double> IntrinsicTriangulation::recoverTraceTValues(const std::vecto
     Face f = sharedFace(prev, next);
     prev = prev.inFace(f);
     next = next.inFace(f);
-    Vector3 triangleLengths{inputGeom.edgeLengths[f.halfedge().edge()],
-                            inputGeom.edgeLengths[f.halfedge().next().edge()],
-                            inputGeom.edgeLengths[f.halfedge().next().next().edge()]};
+
+    // lengths[i] is the length of the edge opposite the i'th vertex
+    Vector3 triangleLengths{inputGeom.edgeLengths[f.halfedge().next().edge()],
+                            inputGeom.edgeLengths[f.halfedge().next().next().edge()],
+                            inputGeom.edgeLengths[f.halfedge().edge()]};
     Vector3 disp = next.faceCoords - prev.faceCoords;
     double len = displacementLength(disp, triangleLengths);
     tVals[iP + 1] = tVals[iP] + len;

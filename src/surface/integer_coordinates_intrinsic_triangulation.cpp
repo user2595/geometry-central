@@ -1423,7 +1423,7 @@ Halfedge IntegerCoordinatesIntrinsicTriangulation::splitBoundaryEdge(Halfedge he
 Halfedge IntegerCoordinatesIntrinsicTriangulation::splitInteriorEdge(Halfedge he, double bary, bool verbose) {
   Edge e = he.edge();
 
-  // verbose |= (he.getIndex() == 61363);
+  // verbose |= (he.getIndex() == 51146);
   if (verbose)
     std::cout << "Splitting halfedge " << he << " | " << he.tailVertex() << " -> " << he.tipVertex() << "  at  " << bary
               << std::endl;
