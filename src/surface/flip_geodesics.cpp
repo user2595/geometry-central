@@ -823,6 +823,8 @@ bool FlipEdgeNetwork::wedgeIsClearEndpointsOnly(const FlipPathSegment& pathSegme
 
 void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngleType angleType) {
 
+  std::cout << "  locally shortening..." << std::endl;
+
   // Gather values
   FlipEdgePath& edgePath = *pathSegment.path;
   SegmentID nextID = pathSegment.id;
@@ -831,6 +833,7 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
   std::tie(heNext, prevID, UNUSED) = edgePath.pathHeInfo[nextID];
   if (prevID == INVALID_IND) {
     // This is the first halfedge in a not-closed path
+    std::cout << "\t this is the first halfedge in a non-closed path" << std::endl;
     return;
   }
   Halfedge hePrev = std::get<0>(edgePath.pathHeInfo[prevID]);
@@ -843,6 +846,7 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
 
   if (angleType == SegmentAngleType::Shortest) {
     // nothing to do here
+    std::cout << "\t angle already shortest" << std::endl;
     return;
   }
   nShortenIters++;
@@ -850,6 +854,7 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
   // Special case for loop consisting of a single self-edge
   if (prevID == nextID) {
     processSingleEdgeLoop(pathSegment, angleType);
+    std::cout << "\t single self edge" << std::endl;
     return;
   }
 
@@ -929,7 +934,12 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
 
   // Make sure the new path is actually shorter (this would never happen in the Reals, but can rarely happen if an edge
   // is numerically unflippable for floating point reasons)
-  if (newPathLength > initPathLength) return;
+  if (newPathLength > initPathLength) {
+    std::cout << "\t weird numerical error" << std::endl;
+    std::cout << "\t  new length: " << newPathLength << std::endl;
+    std::cout << "\t init length: " << initPathLength << std::endl;
+    return;
+  }
 
 
   // Make sure the new path orientation matches the orientation of the input edges
@@ -1021,7 +1031,7 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
   size_t nIterations = 0;
 
   while (!wedgeAngleQueue.empty() && (maxIterations == INVALID_IND || nIterations < maxIterations)) {
-    // std::cout << "Checking wedge" << std::endl;
+    std::cout << "Checking wedge" << std::endl;
 
     // Get the smallest angle
     double minAngle = std::get<0>(wedgeAngleQueue.top());
@@ -1043,7 +1053,7 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
     // TODO I think we _might_ be able to argue that this check isn't necessary, and the wedge will always be clear as
     // long as we check it before inserting in to the queue
     if (!wedgeIsClear(pathSegment, angleType)) {
-      // std::cout << "\twedge is not clear >:(" << std::endl;
+      std::cout << "\twedge is not clear >:(" << std::endl;
       continue;
     }
 
