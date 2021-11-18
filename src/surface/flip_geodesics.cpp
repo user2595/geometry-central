@@ -897,6 +897,7 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
       // Try to flip the edge. Note that flipping will only be possible iff \beta < \pi as in the formal algorithm
       // statement
       bool flipped = tri->flipEdgeIfPossible(currEdge);
+      std::cout << "    tried to flip " << currEdge << (flipped ? " and succeeded!" : " but failed :'(") << std::endl;
 
       if (flipped) {
         nFlips++;
@@ -1140,6 +1141,8 @@ void FlipEdgeNetwork::addAllWedgesToAngleQueue() {
 }
 
 void FlipEdgeNetwork::addPathWedgesToAngleQueue(FlipEdgePath* path) {
+  std::cout << "Adding path to angle queue" << std::endl;
+  std::cout << "  halfedges: ";
   for (auto it : path->pathHeInfo) {
     // Gather values
     SegmentID currID = it.first;
@@ -1149,8 +1152,10 @@ void FlipEdgeNetwork::addPathWedgesToAngleQueue(FlipEdgePath* path) {
 
     if (prevID != INVALID_IND) {
       addToWedgeAngleQueue(FlipPathSegment{path, currID});
+      std::cout << currHe << " ";
     }
   }
+  std::cout << std::endl;
 }
 
 void FlipEdgeNetwork::makeDelaunay() {
@@ -1163,6 +1168,8 @@ void FlipEdgeNetwork::makeDelaunay() {
   tri->setMarkedEdges(fixedEdges);
 
   tri->flipToDelaunay();
+
+  tri->clearMarkedEdges();
 }
 
 void FlipEdgeNetwork::delaunayRefine(double areaThresh, size_t maxInsertions, double angleBound) {
@@ -1184,6 +1191,8 @@ void FlipEdgeNetwork::delaunayRefine(double areaThresh, size_t maxInsertions, do
   tri->delaunayRefine(angleBound, areaThresh, maxInsertions);
 
   // tri->edgeSplitCallbackList.erase(callbackRef); // remove the callback we registered
+
+  tri->clearMarkedEdges();
 }
 
 void FlipEdgeNetwork::splitPathsAlongInputEdges() {

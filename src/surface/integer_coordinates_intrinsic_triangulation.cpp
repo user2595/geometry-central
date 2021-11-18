@@ -441,7 +441,13 @@ bool IntegerCoordinatesIntrinsicTriangulation::flipEdgeIfNotDelaunay(Edge e) {
 // TODO
 bool IntegerCoordinatesIntrinsicTriangulation::flipEdgeIfPossible(Edge e) {
   // Can't flip
-  if (isFixed(e)) return false;
+  if (isFixed(e)) {
+    std::cout << "Cannot flip " << e << " because it is fixed" << std::endl;
+
+    std::cout << "  on boundary: " << e.isBoundary() << std::endl;
+    std::cout << "  on marked: " << (markedEdges.size() > 0 && markedEdges[e]) << std::endl;
+    return false;
+  }
 
   // Get geometric data
   Halfedge he = e.halfedge();

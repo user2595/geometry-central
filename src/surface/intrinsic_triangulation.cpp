@@ -58,6 +58,8 @@ void IntrinsicTriangulation::setMarkedEdges(const EdgeData<bool>& markedEdges_) 
   markedEdges.setDefault(false);
 }
 
+void IntrinsicTriangulation::clearMarkedEdges() { markedEdges = EdgeData<bool>(); }
+
 // ======================================================
 // ======== Queries & Accessors
 // ======================================================

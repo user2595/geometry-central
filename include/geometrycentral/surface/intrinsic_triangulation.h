@@ -66,6 +66,7 @@ public:
   // this possiblity.
   EdgeData<bool> markedEdges;
   void setMarkedEdges(const EdgeData<bool>& markedEdges);
+  void clearMarkedEdges();
   // Is this a marked or boundary edge?
   bool isFixed(Edge e) const;
   bool isOnFixedEdge(Vertex v) const; // boundary vertex or on fixed edge
