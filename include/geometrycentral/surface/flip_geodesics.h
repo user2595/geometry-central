@@ -64,6 +64,8 @@ public:
   std::vector<Halfedge> getHalfedgeList();
 
   void removeFromNetwork(); // WARNING: Removes segments, but *does not* remove path from paths list
+
+  double length() const; // measure the length of the path
 };
 
 

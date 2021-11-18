@@ -20,7 +20,6 @@ FlipEdgePath::FlipEdgePath(FlipEdgeNetwork& network_, std::vector<Halfedge> half
   SegmentID firstID = INVALID_IND;
   for (Halfedge newHe : halfedges_) {
 
-
     // Get a new ID and entry
     SegmentID newHeID = network.getNextUniquePathSegmentInd();
     std::tuple<Halfedge, SegmentID, SegmentID> newEntry{newHe, loopPrevID, INVALID_IND};
@@ -87,6 +86,19 @@ void FlipEdgePath::removeFromNetwork() {
   }
 }
 
+double FlipEdgePath::length() const {
+  double length = 0;
+  for (auto it : pathHeInfo) {
+    // Gather values
+    SegmentID currID = it.first;
+    SegmentID prevID, nextID;
+    Halfedge currHe;
+    std::tie(currHe, prevID, nextID) = it.second;
+
+    length += network.tri->edgeLengths[currHe.edge()];
+  }
+  return length;
+}
 
 void FlipEdgePath::replacePathSegment(SegmentID nextID, SegmentAngleType angleType,
                                       const std::vector<Halfedge>& newHalfedges) {
@@ -892,6 +904,8 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
       // Try to flip the edge. Note that flipping will only be possible iff \beta < \pi as in the formal algorithm
       // statement
       bool flipped = tri->flipEdgeIfPossible(currEdge);
+      // std::cout << "tried to flip " << currEdge << (flipped ? " and succeeded!" : " but failed :'(")
+      //           << " | sPrev: " << sPrev << "    sCurr: " << sCurr << "   sNext: " << sNext << std::endl;
 
       if (flipped) {
         nFlips++;
@@ -1022,6 +1036,9 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
 
   size_t nIterations = 0;
 
+  // Keep track of unclear wedges and try again after we've straightened all the clear ones
+  std::vector<FlipPathSegment> secondChanceQueue;
+
   while (!wedgeAngleQueue.empty() && (maxIterations == INVALID_IND || nIterations < maxIterations)) {
 
     // Get the smallest angle
@@ -1030,13 +1047,19 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
     FlipPathSegment pathSegment = std::get<2>(wedgeAngleQueue.top());
     wedgeAngleQueue.pop();
 
+    Halfedge pathSegmentHe = std::get<0>(pathSegment.path->pathHeInfo[pathSegment.id]);
+    // std::cout << "processing pathSegment " << pathSegmentHe << std::endl;
+
     // Check if its a stale entry
     FlipEdgePath& path = *pathSegment.path;
     if (path.pathHeInfo.find(pathSegment.id) == path.pathHeInfo.end()) {
+      // std::cout << " segment no longer exists" << std::endl;
       continue; // segment no longer exists
     }
     double currAngle = minWedgeAngle(pathSegment);
     if (currAngle != minAngle) {
+      // std::cout << " angle has changed" << std::endl;
+      secondChanceQueue.emplace_back(pathSegment);
       continue; // angle has changed
     }
 
@@ -1044,7 +1067,8 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
     // TODO I think we _might_ be able to argue that this check isn't necessary, and the wedge will always be clear as
     // long as we check it before inserting in to the queue
     if (!wedgeIsClear(pathSegment, angleType)) {
-      std::cout << "\twedge is not clear >:(" << std::endl;
+      // std::cout << "\twedge is not clear >:(" << std::endl;
+      secondChanceQueue.emplace_back(pathSegment);
       continue;
     }
 
@@ -1068,6 +1092,38 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
         break;
       }
     }
+  }
+
+  // See if any wedges have been cleared up
+  bool canMakeProgress = false;
+  for (FlipPathSegment& seg : secondChanceQueue) {
+    // Gather values
+    FlipEdgePath& edgePath = *seg.path;
+    SegmentID nextID = seg.id;
+    SegmentID prevID, UNUSED;
+    Halfedge heNext;
+    std::tie(heNext, prevID, UNUSED) = edgePath.pathHeInfo[nextID];
+    if (prevID == INVALID_IND) {
+      continue; // This is the first halfedge in a not-closed path
+    }
+    Halfedge hePrev = std::get<0>(edgePath.pathHeInfo[prevID]);
+
+    // Measure the angles on both sides
+    ShortestReturnBoth testResult = locallyShortestTestWithBoth(hePrev, heNext);
+
+    if ((testResult.minType != SegmentAngleType::Shortest && wedgeIsClear(seg, testResult.minType)) ||
+        (testResult.maxType != SegmentAngleType::Shortest && wedgeIsClear(seg, testResult.maxType))) {
+      canMakeProgress = true;
+      break;
+    }
+  }
+  if (canMakeProgress) {
+    for (FlipPathSegment& seg : secondChanceQueue) {
+      addToWedgeAngleQueue(seg);
+    }
+    // TODO: set length decrease here
+    // TODO: don't loop forever
+    iterativeShorten(maxIterations - nIterations);
   }
 }
 
@@ -1406,8 +1462,8 @@ void FlipEdgeNetwork::bezierSubdivideRecursive(size_t nRoundsRemaining, const Ve
 
 void FlipEdgeNetwork::rewind() {
   if (!supportRewinding) {
-    throw std::runtime_error(
-        "Called FlipEdgeNetwork::rewind(), but rewinding is not supported. Set supportRewinding=true on construction.");
+    throw std::runtime_error("Called FlipEdgeNetwork::rewind(), but rewinding is not supported. Set "
+                             "supportRewinding=true on construction.");
   }
 
   // TODO in theory, we might want to separate out the idea of undoing a sequence of flips, and of clearing the
@@ -1589,18 +1645,8 @@ double FlipEdgeNetwork::length() {
 
   for (auto& epPtr : paths) {
     if (!epPtr) continue;
-    FlipEdgePath& path = *epPtr;
 
-    for (auto it : path.pathHeInfo) {
-
-      // Gather values
-      SegmentID currID = it.first;
-      SegmentID prevID, nextID;
-      Halfedge currHe;
-      std::tie(currHe, prevID, nextID) = it.second;
-
-      length += tri->edgeLengths[currHe.edge()];
-    }
+    length += epPtr->length();
   }
 
   return length;
