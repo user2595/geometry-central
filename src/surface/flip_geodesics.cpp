@@ -823,8 +823,6 @@ bool FlipEdgeNetwork::wedgeIsClearEndpointsOnly(const FlipPathSegment& pathSegme
 
 void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngleType angleType) {
 
-  std::cout << "  locally shortening..." << std::endl;
-
   // Gather values
   FlipEdgePath& edgePath = *pathSegment.path;
   SegmentID nextID = pathSegment.id;
@@ -833,7 +831,6 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
   std::tie(heNext, prevID, UNUSED) = edgePath.pathHeInfo[nextID];
   if (prevID == INVALID_IND) {
     // This is the first halfedge in a not-closed path
-    std::cout << "\t this is the first halfedge in a non-closed path" << std::endl;
     return;
   }
   Halfedge hePrev = std::get<0>(edgePath.pathHeInfo[prevID]);
@@ -846,7 +843,6 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
 
   if (angleType == SegmentAngleType::Shortest) {
     // nothing to do here
-    std::cout << "\t angle already shortest" << std::endl;
     return;
   }
   nShortenIters++;
@@ -854,7 +850,6 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
   // Special case for loop consisting of a single self-edge
   if (prevID == nextID) {
     processSingleEdgeLoop(pathSegment, angleType);
-    std::cout << "\t single self edge" << std::endl;
     return;
   }
 
@@ -897,7 +892,6 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
       // Try to flip the edge. Note that flipping will only be possible iff \beta < \pi as in the formal algorithm
       // statement
       bool flipped = tri->flipEdgeIfPossible(currEdge);
-      std::cout << "    tried to flip " << currEdge << (flipped ? " and succeeded!" : " but failed :'(") << std::endl;
 
       if (flipped) {
         nFlips++;
@@ -936,9 +930,6 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
   // Make sure the new path is actually shorter (this would never happen in the Reals, but can rarely happen if an edge
   // is numerically unflippable for floating point reasons)
   if (newPathLength > initPathLength) {
-    std::cout << "\t weird numerical error" << std::endl;
-    std::cout << "\t  new length: " << newPathLength << std::endl;
-    std::cout << "\t init length: " << initPathLength << std::endl;
     return;
   }
 
@@ -1032,7 +1023,6 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
   size_t nIterations = 0;
 
   while (!wedgeAngleQueue.empty() && (maxIterations == INVALID_IND || nIterations < maxIterations)) {
-    std::cout << "Checking wedge" << std::endl;
 
     // Get the smallest angle
     double minAngle = std::get<0>(wedgeAngleQueue.top());
@@ -1141,8 +1131,6 @@ void FlipEdgeNetwork::addAllWedgesToAngleQueue() {
 }
 
 void FlipEdgeNetwork::addPathWedgesToAngleQueue(FlipEdgePath* path) {
-  std::cout << "Adding path to angle queue" << std::endl;
-  std::cout << "  halfedges: ";
   for (auto it : path->pathHeInfo) {
     // Gather values
     SegmentID currID = it.first;
@@ -1152,10 +1140,8 @@ void FlipEdgeNetwork::addPathWedgesToAngleQueue(FlipEdgePath* path) {
 
     if (prevID != INVALID_IND) {
       addToWedgeAngleQueue(FlipPathSegment{path, currID});
-      std::cout << currHe << " ";
     }
   }
-  std::cout << std::endl;
 }
 
 void FlipEdgeNetwork::makeDelaunay() {
