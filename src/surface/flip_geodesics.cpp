@@ -95,9 +95,24 @@ double FlipEdgePath::length() const {
     Halfedge currHe;
     std::tie(currHe, prevID, nextID) = it.second;
 
+    GC_SAFETY_ASSERT(currHe != Halfedge(), "invalid hedge");
+
     length += network.tri->edgeLengths[currHe.edge()];
   }
   return length;
+}
+
+void FlipEdgePath::validate() const {
+  for (auto it : pathHeInfo) {
+    // Gather values
+    SegmentID currID = it.first;
+    SegmentID prevID, nextID;
+    Halfedge currHe;
+    std::tie(currHe, prevID, nextID) = it.second;
+
+    // Check that the halfedge points to an actual halfedge
+    if (currHe.getMesh() == nullptr) throw std::runtime_error("bad halfedge entry");
+  }
 }
 
 void FlipEdgePath::replacePathSegment(SegmentID nextID, SegmentAngleType angleType,
@@ -1040,6 +1055,8 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
   std::vector<FlipPathSegment> secondChanceQueue;
 
   while (!wedgeAngleQueue.empty() && (maxIterations == INVALID_IND || nIterations < maxIterations)) {
+    // std::cout << "considering something" << std::endl;
+    // validate();
 
     // Get the smallest angle
     double minAngle = std::get<0>(wedgeAngleQueue.top());
@@ -1118,6 +1135,7 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
     }
   }
   if (canMakeProgress) {
+    // std::cout << "hello from the other side" << std::endl;
     for (FlipPathSegment& seg : secondChanceQueue) {
       addToWedgeAngleQueue(seg);
     }
@@ -1621,21 +1639,7 @@ FlipPathSegment FlipEdgeNetwork::getLast() {
 void FlipEdgeNetwork::validateHalfedgesOnly() {
   for (auto& epPtr : paths) {
     if (!epPtr) continue;
-    FlipEdgePath& path = *epPtr;
-
-    int prevInvalidCount = 0;
-    int nextInvalidCount = 0;
-    for (auto it : path.pathHeInfo) {
-
-      // Gather values
-      SegmentID currID = it.first;
-      SegmentID prevID, nextID;
-      Halfedge currHe;
-      std::tie(currHe, prevID, nextID) = it.second;
-
-      // Check that the halfedge points to an actual halfedge
-      if (currHe.getMesh() == nullptr) throw std::runtime_error("bad halfedge entry");
-    }
+    epPtr->validate();
   }
 }
 
