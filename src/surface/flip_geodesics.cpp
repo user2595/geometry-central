@@ -1041,7 +1041,8 @@ void FlipEdgeNetwork::processSingleEdgeLoop(FlipPathSegment& pathSegment, Segmen
   }
 }
 
-void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeLengthDecrease) {
+void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeLengthDecrease,
+                                       size_t maxRecursionDepth) {
   bool verbose = false;
   bool checkLength = maxRelativeLengthDecrease != 0;
   double initLength = -777;
@@ -1147,7 +1148,7 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
       }
     }
   }
-  if (canMakeProgress) {
+  if (canMakeProgress && maxRecursionDepth > 0) {
     if (verbose) std::cout << "hello from the other side" << std::endl;
     for (FlipPathSegment& seg : secondChanceQueue) {
 
@@ -1165,9 +1166,12 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
         if (verbose) std::cout << "   I found a deleted segment" << std::endl;
       }
     }
-    // TODO: set length decrease here
-    // TODO: don't loop forever
-    iterativeShorten(maxIterations - nIterations);
+    if (checkLength) {
+      double currLength = length();
+      double minLength = maxRelativeLengthDecrease * initLength;
+      maxRelativeLengthDecrease = minLength / currLength;
+    }
+    iterativeShorten(maxIterations - nIterations, maxRelativeLengthDecrease, maxRecursionDepth - 1);
   }
 }
 

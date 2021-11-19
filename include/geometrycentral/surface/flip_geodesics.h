@@ -231,7 +231,8 @@ public:
   void locallyShortenAt(FlipPathSegment& pathSegmentNext, SegmentAngleType angleType);
 
   // Iteratively straighten the smallest angle in any path
-  void iterativeShorten(size_t maxIterations = INVALID_IND, double maxRelativeLengthDecrease = 0.);
+  void iterativeShorten(size_t maxIterations = INVALID_IND, double maxRelativeLengthDecrease = 0.,
+                        size_t maxRecursionDepth = 5);
 
   // Flip non-path edges to make the triangulation Delaunay away from the path
   void makeDelaunay();
