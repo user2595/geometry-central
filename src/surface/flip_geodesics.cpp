@@ -920,7 +920,7 @@ void FlipEdgeNetwork::locallyShortenAt(FlipPathSegment& pathSegment, SegmentAngl
       // statement
       bool flipped = tri->flipEdgeIfPossible(currEdge);
       // std::cout << "tried to flip " << currEdge << (flipped ? " and succeeded!" : " but failed :'(")
-      //           << " | sPrev: " << sPrev << "    sCurr: " << sCurr << "   sNext: " << sNext << std::endl;
+      // << " | sPrev: " << sPrev << "    sCurr: " << sCurr << "   sNext: " << sNext << std::endl;
 
       if (flipped) {
         nFlips++;
@@ -1042,7 +1042,7 @@ void FlipEdgeNetwork::processSingleEdgeLoop(FlipPathSegment& pathSegment, Segmen
 }
 
 void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeLengthDecrease) {
-
+  bool verbose = false;
   bool checkLength = maxRelativeLengthDecrease != 0;
   double initLength = -777;
   if (checkLength) {
@@ -1055,7 +1055,7 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
   std::vector<FlipPathSegment> secondChanceQueue;
 
   while (!wedgeAngleQueue.empty() && (maxIterations == INVALID_IND || nIterations < maxIterations)) {
-    // std::cout << "considering something" << std::endl;
+    if (verbose) std::cout << "considering something" << std::endl;
     // validate();
 
     // Get the smallest angle
@@ -1064,13 +1064,17 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
     FlipPathSegment pathSegment = std::get<2>(wedgeAngleQueue.top());
     wedgeAngleQueue.pop();
 
-    Halfedge pathSegmentHe = std::get<0>(pathSegment.path->pathHeInfo[pathSegment.id]);
-    // std::cout << "processing pathSegment " << pathSegmentHe << std::endl;
+    auto segmentInfoIterator = pathSegment.path->pathHeInfo.find(pathSegment.id);
+    // Check if segment is still in path (it may have been deleted)
+    if (segmentInfoIterator == pathSegment.path->pathHeInfo.end()) continue;
+    Halfedge pathSegmentHe = std::get<0>(segmentInfoIterator->second);
+
+    if (verbose) std::cout << "processing pathSegment " << pathSegmentHe << std::endl;
 
     // Check if its a stale entry
     FlipEdgePath& path = *pathSegment.path;
     if (path.pathHeInfo.find(pathSegment.id) == path.pathHeInfo.end()) {
-      // std::cout << " segment no longer exists" << std::endl;
+      if (verbose) std::cout << " segment no longer exists" << std::endl;
       continue; // segment no longer exists
     }
     double currAngle = minWedgeAngle(pathSegment);
@@ -1084,7 +1088,7 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
     // TODO I think we _might_ be able to argue that this check isn't necessary, and the wedge will always be clear as
     // long as we check it before inserting in to the queue
     if (!wedgeIsClear(pathSegment, angleType)) {
-      // std::cout << "\twedge is not clear >:(" << std::endl;
+      if (verbose) std::cout << "\twedge is not clear >:(" << std::endl;
       secondChanceQueue.emplace_back(pathSegment);
       continue;
     }
@@ -1117,27 +1121,49 @@ void FlipEdgeNetwork::iterativeShorten(size_t maxIterations, double maxRelativeL
     // Gather values
     FlipEdgePath& edgePath = *seg.path;
     SegmentID nextID = seg.id;
-    SegmentID prevID, UNUSED;
-    Halfedge heNext;
-    std::tie(heNext, prevID, UNUSED) = edgePath.pathHeInfo[nextID];
-    if (prevID == INVALID_IND) {
-      continue; // This is the first halfedge in a not-closed path
-    }
-    Halfedge hePrev = std::get<0>(edgePath.pathHeInfo[prevID]);
 
-    // Measure the angles on both sides
-    ShortestReturnBoth testResult = locallyShortestTestWithBoth(hePrev, heNext);
+    auto segmentInfoIterator = edgePath.pathHeInfo.find(nextID);
 
-    if ((testResult.minType != SegmentAngleType::Shortest && wedgeIsClear(seg, testResult.minType)) ||
-        (testResult.maxType != SegmentAngleType::Shortest && wedgeIsClear(seg, testResult.maxType))) {
-      canMakeProgress = true;
-      break;
+    // Check if segment is still in path (it may have been deleted)
+    if (segmentInfoIterator == edgePath.pathHeInfo.end()) {
+      continue;
+    } else {
+      SegmentID prevID, UNUSED;
+      Halfedge heNext;
+
+      std::tie(heNext, prevID, UNUSED) = segmentInfoIterator->second;
+      if (prevID == INVALID_IND) {
+        continue; // This is the first halfedge in a not-closed path
+      }
+      Halfedge hePrev = std::get<0>(edgePath.pathHeInfo[prevID]);
+
+      // Measure the angles on both sides
+      ShortestReturnBoth testResult = locallyShortestTestWithBoth(hePrev, heNext);
+
+      if ((testResult.minType != SegmentAngleType::Shortest && wedgeIsClear(seg, testResult.minType)) ||
+          (testResult.maxType != SegmentAngleType::Shortest && wedgeIsClear(seg, testResult.maxType))) {
+        canMakeProgress = true;
+        break;
+      }
     }
   }
   if (canMakeProgress) {
-    // std::cout << "hello from the other side" << std::endl;
+    if (verbose) std::cout << "hello from the other side" << std::endl;
     for (FlipPathSegment& seg : secondChanceQueue) {
-      addToWedgeAngleQueue(seg);
+
+      // Gather values
+      FlipEdgePath& edgePath = *seg.path;
+      SegmentID nextID = seg.id;
+
+      auto segmentInfoIterator = edgePath.pathHeInfo.find(nextID);
+
+      // Check if segment is still in path (it may have been deleted)
+      if (segmentInfoIterator != edgePath.pathHeInfo.end()) {
+        if (verbose) std::cout << "Adding wedge for halfedge " << std::get<0>(segmentInfoIterator->second) << std::endl;
+        addToWedgeAngleQueue(seg);
+      } else {
+        if (verbose) std::cout << "   I found a deleted segment" << std::endl;
+      }
     }
     // TODO: set length decrease here
     // TODO: don't loop forever
