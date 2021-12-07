@@ -24,11 +24,26 @@ inline double EdgeLengthGeometry::faceArea(Face f) const {
 // Vertex dual areas
 inline double EdgeLengthGeometry::vertexDualArea(Vertex v) const {
   // WARNING: Logic duplicated between cached and immediate version
-   double area = 0.;
-   for( Face f : v.adjacentFaces() ) {
-      area += faceArea(f);
-   }
-   return area/3.;
+  double area = 0.;
+  for (Face f : v.adjacentFaces()) {
+    area += faceArea(f);
+  }
+  return area / 3.;
+}
+
+inline double EdgeLengthGeometry::vertexCircumcentricDualArea(Vertex v) const {
+  // WARNING: Logic duplicated between cached and immediate version
+  double area = 0;
+  for (Halfedge he : v.outgoingHalfedges()) {
+    // Formula from http://www.cs.cmu.edu/~kmcrane/Projects/Other/TriangleAreasCheatSheet.pdf
+    double u2 = pow(edgeLengths[he.next().next().edge()], 2);
+    double v2 = pow(edgeLengths[he.edge()], 2);
+    double cotAlpha = halfedgeCotanWeights[he.next().next()];
+    double cotBeta = halfedgeCotanWeights[he];
+    // divide by 4 instead of 8 since halfedgeCotanWeights are already divided by 2
+    area += (u2 * cotAlpha + v2 * cotBeta) / 4.;
+  }
+  return area;
 }
 
 // Corner angles
@@ -76,16 +91,16 @@ inline double EdgeLengthGeometry::halfedgeCotanWeight(Halfedge heI) const {
 inline double EdgeLengthGeometry::vertexGaussianCurvature(Vertex v) const {
   // WARNING: Logic duplicated between cached and immediate version
 
-   // the triangles neighboring any boundary vertex can be flattened into
-   // the plane without any stretching/distortion; hence, a boundary
-   // vertex has no Gaussian curvature
-   if( v.isBoundary() ) return 0.;
+  // the triangles neighboring any boundary vertex can be flattened into
+  // the plane without any stretching/distortion; hence, a boundary
+  // vertex has no Gaussian curvature
+  if (v.isBoundary()) return 0.;
 
-   double gaussianCurvature = 2.*PI;
-   for (Corner c : v.adjacentCorners() ) {
-      gaussianCurvature -= cornerAngle(c);
-   }
-   return gaussianCurvature;
+  double gaussianCurvature = 2. * PI;
+  for (Corner c : v.adjacentCorners()) {
+    gaussianCurvature -= cornerAngle(c);
+  }
+  return gaussianCurvature;
 }
 
 inline double EdgeLengthGeometry::edgeCotanWeight(Edge e) const {

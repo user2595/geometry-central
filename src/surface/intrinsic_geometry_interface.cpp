@@ -15,18 +15,19 @@ namespace surface {
 IntrinsicGeometryInterface::IntrinsicGeometryInterface(SurfaceMesh& mesh_) : 
   BaseGeometryInterface(mesh_), 
 
-  edgeLengthsQ              (&edgeLengths,                  std::bind(&IntrinsicGeometryInterface::computeEdgeLengths, this),               quantities),
-  faceAreasQ                (&faceAreas,                    std::bind(&IntrinsicGeometryInterface::computeFaceAreas, this),                 quantities),
-  vertexDualAreasQ          (&vertexDualAreas,              std::bind(&IntrinsicGeometryInterface::computeVertexDualAreas, this),           quantities),
-  cornerAnglesQ             (&cornerAngles,                 std::bind(&IntrinsicGeometryInterface::computeCornerAngles, this),              quantities),
-  vertexAngleSumsQ          (&vertexAngleSums,              std::bind(&IntrinsicGeometryInterface::computeVertexAngleSums, this),           quantities),
-  cornerScaledAnglesQ       (&cornerScaledAngles,           std::bind(&IntrinsicGeometryInterface::computeCornerScaledAngles, this),        quantities),
-  vertexGaussianCurvaturesQ (&vertexGaussianCurvatures,     std::bind(&IntrinsicGeometryInterface::computeVertexGaussianCurvatures, this),  quantities),
-  faceGaussianCurvaturesQ   (&faceGaussianCurvatures,       std::bind(&IntrinsicGeometryInterface::computeFaceGaussianCurvatures, this),    quantities),
-  halfedgeCotanWeightsQ     (&halfedgeCotanWeights,         std::bind(&IntrinsicGeometryInterface::computeHalfedgeCotanWeights, this),      quantities),
-  edgeCotanWeightsQ         (&edgeCotanWeights,             std::bind(&IntrinsicGeometryInterface::computeEdgeCotanWeights, this),          quantities),
-  shapeLengthScaleQ         (&shapeLengthScale,             std::bind(&IntrinsicGeometryInterface::computeShapeLengthScale, this),          quantities),
-  meshLengthScaleQ          (&meshLengthScale,              std::bind(&IntrinsicGeometryInterface::computeMeshLengthScale, this),          quantities),
+  edgeLengthsQ                  (&edgeLengths,                  std::bind(&IntrinsicGeometryInterface::computeEdgeLengths, this),                  quantities),
+  faceAreasQ                    (&faceAreas,                    std::bind(&IntrinsicGeometryInterface::computeFaceAreas, this),                    quantities),
+  vertexDualAreasQ              (&vertexDualAreas,              std::bind(&IntrinsicGeometryInterface::computeVertexDualAreas, this),              quantities),
+  vertexCircumcentricDualAreasQ (&vertexCircumcentricDualAreas, std::bind(&IntrinsicGeometryInterface::computeVertexCircumcentricDualAreas, this), quantities),
+  cornerAnglesQ                 (&cornerAngles,                 std::bind(&IntrinsicGeometryInterface::computeCornerAngles, this),                 quantities),
+  vertexAngleSumsQ              (&vertexAngleSums,              std::bind(&IntrinsicGeometryInterface::computeVertexAngleSums, this),              quantities),
+  cornerScaledAnglesQ           (&cornerScaledAngles,           std::bind(&IntrinsicGeometryInterface::computeCornerScaledAngles, this),           quantities),
+  vertexGaussianCurvaturesQ     (&vertexGaussianCurvatures,     std::bind(&IntrinsicGeometryInterface::computeVertexGaussianCurvatures, this),     quantities),
+  faceGaussianCurvaturesQ       (&faceGaussianCurvatures,       std::bind(&IntrinsicGeometryInterface::computeFaceGaussianCurvatures, this),       quantities),
+  halfedgeCotanWeightsQ         (&halfedgeCotanWeights,         std::bind(&IntrinsicGeometryInterface::computeHalfedgeCotanWeights, this),         quantities),
+  edgeCotanWeightsQ             (&edgeCotanWeights,             std::bind(&IntrinsicGeometryInterface::computeEdgeCotanWeights, this),             quantities),
+  shapeLengthScaleQ             (&shapeLengthScale,             std::bind(&IntrinsicGeometryInterface::computeShapeLengthScale, this),             quantities),
+  meshLengthScaleQ              (&meshLengthScale,              std::bind(&IntrinsicGeometryInterface::computeMeshLengthScale, this),              quantities),
   
   halfedgeVectorsInFaceQ            (&halfedgeVectorsInFace,            std::bind(&IntrinsicGeometryInterface::computeHalfedgeVectorsInFace, this),             quantities),
   transportVectorsAcrossHalfedgeQ   (&transportVectorsAcrossHalfedge,   std::bind(&IntrinsicGeometryInterface::computeTransportVectorsAcrossHalfedge, this),    quantities),
@@ -103,6 +104,28 @@ void IntrinsicGeometryInterface::computeVertexDualAreas() {
 void IntrinsicGeometryInterface::requireVertexDualAreas() { vertexDualAreasQ.require(); }
 void IntrinsicGeometryInterface::unrequireVertexDualAreas() { vertexDualAreasQ.unrequire(); }
 
+// Vertex circumcentric dual area
+void IntrinsicGeometryInterface::computeVertexCircumcentricDualAreas() {
+  edgeLengthsQ.ensureHave();
+  halfedgeCotanWeightsQ.ensureHave();
+
+  vertexCircumcentricDualAreas = VertexData<double>(mesh, 0.);
+
+  for (Vertex v : mesh.vertices()) {
+    for (Halfedge he : v.outgoingHalfedges()) {
+      // WARNING: Logic duplicated between cached and immediate version
+      // Formula from http://www.cs.cmu.edu/~kmcrane/Projects/Other/TriangleAreasCheatSheet.pdf
+      double u2 = pow(edgeLengths[he.next().next().edge()], 2);
+      double v2 = pow(edgeLengths[he.edge()], 2);
+      double cotAlpha = halfedgeCotanWeights[he.next().next()];
+      double cotBeta = halfedgeCotanWeights[he];
+      // divide by 4 instead of 8 since halfedgeCotanWeights are already divided by 2
+      vertexCircumcentricDualAreas[v] += (u2 * cotAlpha + v2 * cotBeta) / 4.;
+    }
+  }
+}
+void IntrinsicGeometryInterface::requireVertexCircumcentricDualAreas() { vertexCircumcentricDualAreasQ.require(); }
+void IntrinsicGeometryInterface::unrequireVertexCircumcentricDualAreas() { vertexCircumcentricDualAreasQ.unrequire(); }
 
 void IntrinsicGeometryInterface::computeCornerAngles() {
   edgeLengthsQ.ensureHave();
