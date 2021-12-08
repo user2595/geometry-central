@@ -1,5 +1,6 @@
 #pragma once
 
+#include "geometrycentral/utilities/utilities.h"
 #include "geometrycentral/utilities/vector2.h"
 
 #include <array>

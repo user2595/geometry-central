@@ -92,7 +92,6 @@ double angle(const Vector2& u, const Vector2& v);
 double orientedAngle(const Vector2& u, const Vector2& v);
 double dot(const Vector2& u, const Vector2& v);
 double cross(const Vector2& u, const Vector2& v);
-
 // defined in vector3.h now
 // Vector3 cross3(const Vector2& u, const Vector2& v); // assumes arguments are in x-y plane
 
