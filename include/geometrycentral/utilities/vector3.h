@@ -1,6 +1,6 @@
 #pragma once
 
-#include "geometrycentral/utilities/utilities.h"
+#include "geometrycentral/utilities/vector2.h"
 
 #include <array>
 #include <cmath>
@@ -57,6 +57,20 @@ struct Vector3 {
 
   bool isFinite() const;
   bool isDefined() const;
+
+  // Cheap swizzling
+  Vector3 xyz() const;
+  Vector3 xzy() const;
+  Vector3 yzx() const;
+  Vector3 yxz() const;
+  Vector3 zxy() const;
+  Vector3 zyx() const;
+  Vector2 yz() const;
+  Vector2 zy() const;
+  Vector2 zx() const;
+  Vector2 xz() const;
+  Vector2 xy() const;
+  Vector2 yx() const;
 };
 
 // Scalar multiplication
@@ -75,6 +89,8 @@ Vector3 normalizeCutoff(const Vector3& v, double mag = 0.);
 Vector3 unit(const Vector3& v);
 
 Vector3 cross(const Vector3& u, const Vector3& v);
+Vector3 cross3(const Vector2& u, const Vector2& v); // assumes arguments are in x-y plane
+
 double angle(const Vector3& u, const Vector3& v);
 double angleInPlane(const Vector3& u, const Vector3& v, const Vector3& normal);
 double dot(const Vector3& u, const Vector3& v);

@@ -137,7 +137,6 @@ inline double orientedAngle(const Vector2& u, const Vector2& v) {
 }
 
 inline double cross(const Vector2& u, const Vector2& v) { return u.x * v.y - u.y * v.x; }
-inline Vector3 cross3(const Vector2& u, const Vector2& v) { return Vector3{0., 0., u.x * v.y - u.y * v.x}; }
 inline Vector2 clamp(const Vector2& val, const Vector2& low, const Vector2& high) {
   Vector2 rVal;
   for (int i = 0; i < 2; i++) {

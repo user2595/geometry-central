@@ -68,6 +68,7 @@ inline Vector3 cross(const Vector3& u, const Vector3& v) {
   double z = u.x * v.y - u.y * v.x;
   return Vector3{x, y, z};
 }
+inline Vector3 cross3(const Vector2& u, const Vector2& v) { return Vector3{0., 0., u.x * v.y - u.y * v.x}; }
 
 inline double dot(const Vector3& u, const Vector3& v) { return u.x * v.x + u.y * v.y + u.z * v.z; }
 inline double sum(const Vector3& u) { return u.x + u.y + u.z; }
@@ -93,6 +94,20 @@ inline bool isfinite(const Vector3& v) { return v.isFinite(); }
 
 inline bool Vector3::isDefined() const { return (!::std::isnan(x)) && (!::std::isnan(y)) && (!::std::isnan(z)); }
 inline bool isDefined(const Vector3& v) { return v.isDefined(); }
+
+// Cheap swizzling
+inline Vector3 Vector3::xyz() const { return Vector3{x, y, z}; }
+inline Vector3 Vector3::xzy() const { return Vector3{x, z, y}; }
+inline Vector3 Vector3::yzx() const { return Vector3{y, z, x}; }
+inline Vector3 Vector3::yxz() const { return Vector3{y, x, z}; }
+inline Vector3 Vector3::zxy() const { return Vector3{z, x, y}; }
+inline Vector3 Vector3::zyx() const { return Vector3{z, y, x}; }
+inline Vector2 Vector3::yz() const { return Vector2{y, z}; }
+inline Vector2 Vector3::zy() const { return Vector2{z, y}; }
+inline Vector2 Vector3::zx() const { return Vector2{z, x}; }
+inline Vector2 Vector3::xz() const { return Vector2{x, z}; }
+inline Vector2 Vector3::xy() const { return Vector2{x, y}; }
+inline Vector2 Vector3::yx() const { return Vector2{y, x}; }
 
 inline Vector3 clamp(const Vector3& val, const Vector3& low, const Vector3& high) {
   Vector3 rVal;

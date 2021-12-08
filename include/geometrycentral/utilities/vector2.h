@@ -1,12 +1,12 @@
 #pragma once
 
-#include "geometrycentral/utilities/vector3.h"
-
 #include <array>
 #include <cmath>
 #include <iostream>
 #include <limits>
 #include <sstream>
+
+#include "geometrycentral/utilities/utilities.h"
 
 namespace geometrycentral {
 
@@ -92,7 +92,9 @@ double angle(const Vector2& u, const Vector2& v);
 double orientedAngle(const Vector2& u, const Vector2& v);
 double dot(const Vector2& u, const Vector2& v);
 double cross(const Vector2& u, const Vector2& v);
-Vector3 cross3(const Vector2& u, const Vector2& v); // assumes arguments are in x-y plane
+
+// defined in vector3.h now
+// Vector3 cross3(const Vector2& u, const Vector2& v); // assumes arguments are in x-y plane
 
 Vector2 unit(const Vector2& v);
 Vector2 normalize(const Vector2& v);
