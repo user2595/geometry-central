@@ -108,6 +108,7 @@ public:
   // Solve!
   void solve(Vector<T>& x, const Vector<T>& rhs) override;
   Vector<T> solve(const Vector<T>& rhs) override;
+  std::vector<T> solveSparse(const Vector<T>& rhs, const std::vector<size_t>& queryCoordinates);
 
 protected:
   std::unique_ptr<PSDSolverInternals<T>> internals;

@@ -41,6 +41,11 @@ public:
   VertexData<Vector2> computeLogMap(const Vertex& sourceVert, double vertexDistanceShift = 0.);
   VertexData<Vector2> computeLogMap(const SurfacePoint& sourceP);
 
+  std::vector<Vector2> evaluateLogMap(const Vertex& sourceVert, const std::vector<SurfacePoint>& queryPoints,
+                                      double vertexDistanceShift = 0.);
+  std::vector<Vector2> evaluateLogMap(const SurfacePoint& sourceP, const std::vector<SurfacePoint>& queryPoints,
+                                      double vertexDistanceShift = 0.);
+
   // === Options and parameters
   const double tCoef; // the time parameter used for heat flow, measured as time = tCoef * mean_edge_length^2
                       // default: 1.0
@@ -64,7 +69,8 @@ private:
 
   // Solvers
   std::unique_ptr<PositiveDefiniteSolver<double>> scalarHeatSolver;
-  std::unique_ptr<LinearSolver<std::complex<double>>> vectorHeatSolver;
+  // TODO: change back to LinearSolver
+  std::unique_ptr<PositiveDefiniteSolver<std::complex<double>>> vectorHeatSolver;
   std::unique_ptr<PositiveDefiniteSolver<double>> poissonSolver;
   SparseMatrix<double> massMat;
 

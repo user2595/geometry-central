@@ -4,7 +4,7 @@ namespace geometrycentral {
 namespace surface {
 
 namespace {
-const bool VORONOI_PRINT = false;
+const bool VORONOI_PRINT = true;
 }
 
 // The default trace options

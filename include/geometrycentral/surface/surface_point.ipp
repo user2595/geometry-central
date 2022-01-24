@@ -276,7 +276,6 @@ inline bool SurfacePoint::operator!=(const SurfacePoint& other) const { return !
 
 
 inline Face sharedFace(const SurfacePoint& pA, const SurfacePoint& pB) {
-
   switch (pA.type) {
 
   case SurfacePointType::Vertex:
@@ -286,7 +285,6 @@ inline Face sharedFace(const SurfacePoint& pA, const SurfacePoint& pB) {
     break;
 
   case SurfacePointType::Edge:
-
     if (checkAdjacent(SurfacePoint(pA.edge.halfedge().face(), Vector3::zero()), pB)) {
       return pA.edge.halfedge().face();
     }

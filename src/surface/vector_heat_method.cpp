@@ -65,7 +65,9 @@ void VectorHeatMethodSolver::ensureHaveVectorHeatSolver() {
   if (isDelaunay) {
     vectorHeatSolver.reset(new PositiveDefiniteSolver<std::complex<double>>(vectorOp));
   } else {
-    vectorHeatSolver.reset(new SquareSolver<std::complex<double>>(vectorOp)); // not necessarily SPD without Delaunay
+    GC_SAFETY_ASSERT(false, "vector heat method only runs on Delaunay meshes at the moment");
+    // TODO: fix this
+    // vectorHeatSolver.reset(new SquareSolver<std::complex<double>>(vectorOp)); // not necessarily SPD without Delaunay
   }
 
   geom.unrequireVertexConnectionLaplacian();
@@ -350,6 +352,117 @@ VertexData<Vector2> VectorHeatMethodSolver::computeLogMap(const Vertex& sourceVe
   return result;
 }
 
+std::vector<Vector2> VectorHeatMethodSolver::evaluateLogMap(const Vertex& sourceVert,
+                                                            const std::vector<SurfacePoint>& queryPoints,
+                                                            double vertexDistanceShift) {
+  geom.requireFaceAreas();
+  geom.requireEdgeLengths();
+  geom.requireCornerAngles();
+  geom.requireEdgeCotanWeights();
+  geom.requireHalfedgeVectorsInVertex();
+  geom.requireTransportVectorsAlongHalfedge();
+  geom.requireVertexIndices();
+
+  std::vector<size_t> querySupport;
+  for (const SurfacePoint& p : queryPoints) {
+    switch (p.type) {
+    case SurfacePointType::Vertex:
+      querySupport.push_back(geom.vertexIndices[p.vertex]);
+      break;
+    case SurfacePointType::Edge:
+      for (Vertex v : p.edge.adjacentVertices()) {
+        querySupport.push_back(geom.vertexIndices[v]);
+      }
+      break;
+    case SurfacePointType::Face:
+      for (Vertex v : p.face.adjacentVertices()) {
+        querySupport.push_back(geom.vertexIndices[v]);
+      }
+      break;
+    }
+  }
+
+  // Make sure systems have been built and factored
+  ensureHaveVectorHeatSolver();
+  ensureHavePoissonSolver();
+
+  // === Solve for "radial" field
+
+  // Build rhs
+  Vector<std::complex<double>> radialRHS = Vector<std::complex<double>>::Zero(mesh.nVertices());
+  addVertexOutwardBall(sourceVert, radialRHS);
+
+  // Solve
+  Vector<std::complex<double>> radialSol = vectorHeatSolver->solve(radialRHS);
+
+  // Normalize
+  radialSol = (radialSol.array() / radialSol.array().abs());
+  radialSol[geom.vertexIndices[sourceVert]] = 0.;
+
+
+  // === Solve for "horizontal" field
+
+  // Build rhs
+  Vector<std::complex<double>> horizontalRHS = Vector<std::complex<double>>::Zero(mesh.nVertices());
+  horizontalRHS[geom.vertexIndices[sourceVert]] += 1.0;
+
+  // Solve
+  std::vector<std::complex<double>> sparseHorizontalSol = vectorHeatSolver->solveSparse(horizontalRHS, querySupport);
+  VertexData<std::complex<double>> horizontalSol(mesh);
+  for (size_t iiV = 0; iiV < querySupport.size(); iiV++) {
+    size_t iV = querySupport[iiV];
+    horizontalSol[mesh.vertex(iV)] = sparseHorizontalSol[iiV] / abs(sparseHorizontalSol[iiV]);
+  }
+
+  // // Normalize
+  // horizontalSol = (horizontalSol.array() / horizontalSol.array().abs());
+
+
+  // === Integrate radial field to get distance
+
+  // Build the right hand sign (divergence term)
+  Vector<double> divergenceVec = Vector<double>::Zero(mesh.nVertices());
+  for (Halfedge he : mesh.halfedges()) {
+
+    // Build the vector which is the average vector along the edge, in the basis of the tail vertex
+    Vector2 radAtTail = Vector2::fromComplex(radialSol[geom.vertexIndices[he.vertex()]]);
+    Vector2 radAtTip = Vector2::fromComplex(radialSol[geom.vertexIndices[he.twin().vertex()]]);
+    Vector2 radTipAtTail = geom.transportVectorsAlongHalfedge[he.twin()] * radAtTip;
+
+    // Integrate the edge vector along the edge
+    Vector2 vectAtEdge = 0.5 * (radAtTail + radTipAtTail);
+    double fieldAlongEdge = dot(vectAtEdge, geom.halfedgeVectorsInVertex[he]);
+
+    // Contrbution to divergence is cotan times that integral
+    // (negative since we want negative divergence due to Laplacian sign)
+    double weight = geom.edgeCotanWeights[he.edge()];
+    divergenceVec[geom.vertexIndices[he.vertex()]] += -weight * fieldAlongEdge;
+  }
+
+  // Integrate to get distance
+  Vector<double> distance = poissonSolver->solve(divergenceVec);
+
+  // Shift distance to be zero at the source
+  distance = distance.array() + (vertexDistanceShift - distance[geom.vertexIndices[sourceVert]]);
+
+
+  // Combine distance and angle to get cartesian result
+  VertexData<Vector2> fullLogMap(mesh);
+  for (Vertex v : mesh.vertices()) {
+    size_t vInd = geom.vertexIndices[v];
+
+    std::complex<double> logDir = radialSol[vInd] / horizontalSol[v];
+    Vector2 logCoord = Vector2::fromComplex(logDir) * distance[vInd];
+    fullLogMap[v] = logCoord;
+  }
+
+  std::vector<Vector2> result;
+  for (const SurfacePoint& q : queryPoints) {
+    result.push_back(q.interpolate(fullLogMap));
+  }
+  return result;
+}
+
 VertexData<double> VectorHeatMethodSolver::scalarDiffuse(const VertexData<double>& rhs) {
   ensureHaveScalarHeatSolver();
   return VertexData<double>(mesh, scalarHeatSolver->solve(rhs.toVector()));
@@ -493,6 +606,72 @@ VertexData<Vector2> VectorHeatMethodSolver::computeLogMap(const SurfacePoint& so
 
   throw std::logic_error("bad switch");
   return VertexData<Vector2>();
+}
+
+std::vector<Vector2> VectorHeatMethodSolver::evaluateLogMap(const SurfacePoint& sourceP,
+                                                            const std::vector<SurfacePoint>& queryPoints,
+                                                            double vertexDistanceShift) {
+  switch (sourceP.type) {
+  case SurfacePointType::Vertex: {
+
+    return evaluateLogMap(sourceP.vertex, queryPoints, vertexDistanceShift);
+    break;
+  }
+  case SurfacePointType::Edge: {
+    geom.requireHalfedgeVectorsInVertex();
+
+    // Compute logmaps at both adjacent vertices
+    Halfedge he = sourceP.edge.halfedge();
+    std::vector<Vector2> logmapTail = evaluateLogMap(he.tailVertex(), queryPoints, vertexDistanceShift);
+    std::vector<Vector2> logmapTip = evaluateLogMap(he.tipVertex(), queryPoints, vertexDistanceShift);
+
+    // Changes of basis
+    Vector2 tailRot = geom.halfedgeVectorsInVertex[he].inv().normalize();
+    Vector2 tipRot = -geom.halfedgeVectorsInVertex[he.twin()].inv().normalize();
+
+    // Blend result and store in edge basis
+    std::vector<Vector2> result;
+    double tBlend = sourceP.tEdge;
+    for (size_t iP = 0; iP < queryPoints.size(); iP++) {
+      result.push_back((1. - tBlend) * logmapTail[iP] * tailRot + tBlend * logmapTip[iP] * tipRot);
+    }
+
+    geom.unrequireHalfedgeVectorsInVertex();
+    return result;
+    break;
+  }
+  case SurfacePointType::Face: {
+    geom.requireHalfedgeVectorsInVertex();
+    geom.requireHalfedgeVectorsInFace();
+
+    // Accumulate result from adjcent halfedges
+    std::vector<Vector2> result(queryPoints.size(), Vector2::zero());
+    int iC = 0;
+    for (Halfedge he : sourceP.face.adjacentHalfedges()) {
+
+      // Commpute logmap at vertex
+      std::vector<Vector2> logmapVert = evaluateLogMap(he.vertex(), queryPoints, vertexDistanceShift);
+
+      // Compute change of basis to bring it back to the face
+      Vector2 rot = (geom.halfedgeVectorsInFace[he] / geom.halfedgeVectorsInVertex[he]).normalize();
+
+      // Accumulate in face fesult
+      for (size_t iP = 0; iP < queryPoints.size(); iP++) {
+        result[iP] += sourceP.faceCoords[iC] * rot * logmapVert[iP];
+      }
+      iC++;
+    }
+
+
+    geom.unrequireHalfedgeVectorsInVertex();
+    geom.unrequireHalfedgeVectorsInFace();
+    return result;
+    break;
+  }
+  }
+
+  throw std::logic_error("bad switch");
+  return std::vector<Vector2>{};
 }
 
 } // namespace surface
