@@ -64,14 +64,13 @@ PositiveDefiniteSolver<T>::PositiveDefiniteSolver(SparseMatrix<T>& mat)
   internals->factorization = cholmod_l_analyze(internals->cMat, internals->context);
   bool success = (bool)cholmod_l_factorize(internals->cMat, internals->factorization, internals->context);
 
-  if(!success) {
+  if (!success) {
     throw std::runtime_error("failure in cholmod_l_factorize");
   }
-  if(internals->context.context.status == CHOLMOD_NOT_POSDEF) {
+  if (internals->context.context.status == CHOLMOD_NOT_POSDEF) {
     throw std::runtime_error("matrix is not positive definite");
   }
 
-  
 
   // Eigen version
 #else
@@ -115,6 +114,54 @@ void PositiveDefiniteSolver<T>::solve(Vector<T>& x, const Vector<T>& rhs) {
 
   // Convert back
   toEigen(outVec, internals->context, x);
+
+  // Free
+  cholmod_l_free_dense(&outVec, internals->context);
+  cholmod_l_free_dense(&inVec, internals->context);
+
+  // Eigen version
+#else
+  // Solve
+  x = internals->solver.solve(rhs);
+  if (internals->solver.info() != Eigen::Success) {
+    std::cerr << "Solver error: " << internals->solver.info() << std::endl;
+    throw std::invalid_argument("Solve failed");
+  }
+#endif
+}
+
+template <typename T>
+DenseMatrix<T> PositiveDefiniteSolver<T>::solveMatrix(const DenseMatrix<T>& rhs) {
+  DenseMatrix<T> out;
+  solveMatrix(out, rhs);
+  return out;
+}
+
+template <typename T>
+void PositiveDefiniteSolver<T>::solveMatrix(DenseMatrix<T>& x, const DenseMatrix<T>& rhs) {
+
+  size_t N = this->nRows;
+
+  // Check some sanity
+  if ((size_t)rhs.rows() != N) {
+    throw std::logic_error("DenseMatrix is not the right length");
+  }
+#ifndef GC_NLINALG_DEBUG
+  checkFinite(rhs);
+#endif
+
+
+  // Suitesparse version
+#ifdef GC_HAVE_SUITESPARSE
+
+  // Convert input to suitesparse format
+  cholmod_dense* inVec = toCholmod(rhs, internals->context);
+
+  // Solve
+  cholmod_dense* outVec = cholmod_l_solve(CHOLMOD_A, internals->factorization, inVec, internals->context);
+
+  // Convert back
+  toEigenMatrix(outVec, internals->context, x);
 
   // Free
   cholmod_l_free_dense(&outVec, internals->context);

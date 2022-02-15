@@ -108,6 +108,57 @@ void umfSolve<std::complex<double>>(size_t N, cholmod_sparse* mat, void* numeric
                    numericFac, NULL, NULL);
 }
 
+template <typename T>
+void umfSolveRaw(size_t N, cholmod_sparse* mat, void* numericFac, T* x, const T* rhs);
+
+template <>
+void umfSolveRaw(size_t N, cholmod_sparse* mat, void* numericFac, double* x, const double* rhs) {
+  SuiteSparse_long* cMat_p = (SuiteSparse_long*)mat->p;
+  SuiteSparse_long* cMat_i = (SuiteSparse_long*)mat->i;
+  double* cMat_x = (double*)mat->x;
+  umfpack_dl_solve(UMFPACK_A, cMat_p, cMat_i, cMat_x, x, rhs, numericFac, NULL, NULL);
+}
+
+template <>
+void umfSolveRaw(size_t N, cholmod_sparse* mat, void* numericFac, std::complex<double>* x,
+                 const std::complex<double>* rhs) {
+  // Note: the ordering of std::complex is specified by the standard, so this certainly works
+  SuiteSparse_long* cMat_p = (SuiteSparse_long*)mat->p;
+  SuiteSparse_long* cMat_i = (SuiteSparse_long*)mat->i;
+  double* cMat_x = (double*)mat->x;
+  double* x_d = (double*)x;
+  double* rhs_d = (double*)rhs;
+  umfpack_zl_solve(UMFPACK_A, cMat_p, cMat_i, cMat_x, NULL, x_d, NULL, rhs_d, NULL, numericFac, NULL, NULL);
+}
+
+template <typename T>
+void umfSolveMatrix(size_t N, cholmod_sparse* mat, void* numericFac, cholmod_dense* x, const cholmod_dense* rhs);
+
+template <>
+void umfSolveMatrix<double>(size_t N, cholmod_sparse* mat, void* numericFac, cholmod_dense* x,
+                            const cholmod_dense* rhs) {
+  size_t nCols = rhs->ncol;
+  size_t d = rhs->d; // offset between columns
+  // Suitesparse dense matrices are stored in column-major order, so we just solve one column at a time
+  for (size_t iC = 0; iC < nCols; iC++) {
+    size_t offset = iC * d;
+    umfSolveRaw<double>(N, mat, numericFac, (double*)x->x + offset, (double*)rhs->x + offset);
+  }
+}
+
+template <>
+void umfSolveMatrix<std::complex<double>>(size_t N, cholmod_sparse* mat, void* numericFac, cholmod_dense* x,
+                                          const cholmod_dense* rhs) {
+  size_t nCols = rhs->ncol;
+  size_t d = rhs->d; // offset between columns
+  // Suitesparse dense matrices are stored in column-major order, so we just solve one column at a time
+  for (size_t iC = 0; iC < nCols; iC++) {
+    size_t offset = iC * d;
+    umfSolveRaw<std::complex<double>>(N, mat, numericFac, (std::complex<double>*)x->x + offset,
+                                      (std::complex<double>*)rhs->x + offset);
+  }
+}
+
 #endif
 
 } // namespace
@@ -173,6 +224,58 @@ void SquareSolver<T>::solve(Vector<T>& x, const Vector<T>& rhs) {
 
   // Templated helper does all the hard work
   umfSolve<T>(N, internals->cMat, internals->numericFactorization, x, rhs);
+
+  // Eigen version
+#else
+  // Solve
+  x = internals->solver.solve(rhs);
+  if (internals->solver.info() != Eigen::Success) {
+    std::cerr << "Solver error: " << internals->solver.info() << std::endl;
+    std::cerr << "Solver says: " << internals->solver.lastErrorMessage() << std::endl;
+    throw std::invalid_argument("Solve failed");
+  }
+#endif
+}
+
+template <typename T>
+DenseMatrix<T> SquareSolver<T>::solveMatrix(const DenseMatrix<T>& rhs) {
+  DenseMatrix<T> out;
+  solveMatrix(out, rhs);
+  return out;
+}
+
+template <typename T>
+void SquareSolver<T>::solveMatrix(DenseMatrix<T>& x, const DenseMatrix<T>& rhs) {
+
+  size_t N = this->nRows;
+
+  // Check some sanity
+#ifndef GC_NLINALG_DEBUG
+  if ((size_t)rhs.rows() != N) {
+    throw std::logic_error("DenseMatrix is not the right length");
+  }
+  checkFinite(rhs);
+#endif
+
+  // Suitesparse version
+#ifdef GC_HAVE_SUITESPARSE
+
+  // Type wizardry. This type is 'double' if T == 'float', and T otherwise
+  // Needed because cholmod always uses double precision
+  typedef typename std::conditional<std::is_same<T, float>::value, double, T>::type SCALAR_TYPE;
+
+  cholmod_dense* inMat = toCholmod(rhs, internals->context);
+  cholmod_dense* outMat = allocateCholmod<T>(rhs.rows(), rhs.cols(), internals->context);
+
+  // Templated helper does most of the hard work
+  umfSolveMatrix<SCALAR_TYPE>(N, internals->cMat, internals->numericFactorization, outMat, inMat);
+
+  // Convert back
+  toEigenMatrix(outMat, internals->context, x);
+
+  // Free
+  cholmod_l_free_dense(&outMat, internals->context);
+  cholmod_l_free_dense(&inMat, internals->context);
 
   // Eigen version
 #else

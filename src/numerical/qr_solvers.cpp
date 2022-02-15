@@ -201,6 +201,77 @@ Vector<T> solve(SparseMatrix<T>& A, const Vector<T>& rhs) {
   return s.solve(rhs);
 }
 
+template <typename T>
+DenseMatrix<T> Solver<T>::solveMatrix(const DenseMatrix<T>& rhs) {
+  DenseMatrix<T> out;
+  solveMatrix(out, rhs);
+  return out;
+}
+
+template <typename T>
+void Solver<T>::solveMatrix(DenseMatrix<T>& x, const DenseMatrix<T>& rhs) {
+
+  // Check some sanity
+  if ((size_t)rhs.rows() != this->nRows) {
+    throw std::logic_error("Vector is not the right length");
+  }
+#ifndef GC_NLINALG_DEBUG
+  checkFinite(rhs);
+#endif
+
+// Suitesparse version
+#ifdef GC_HAVE_SUITESPARSE
+
+  // Convert input to suitesparse format
+  cholmod_dense* inMat = toCholmod(rhs, internals->context);
+  cholmod_dense* outMat;
+
+  // Solve
+  // outMat = SuiteSparseQR<typename Solver<T>::SOLVER_ENTRYTYPE>(cMat, inMat, internals->context);
+  // Note that the solve strategy is different for underdetermined systems
+  if (underdetermined) {
+
+    // solve y = R^-T b
+    cholmod_dense* y = SuiteSparseQR_solve<typename SOLVER_ENTRYTYPE<T>::type>(
+        SPQR_RTX_EQUALS_B, internals->factorization, inMat, internals->context);
+
+    // compute x = Q*y
+    outMat = SuiteSparseQR_qmult<typename SOLVER_ENTRYTYPE<T>::type>(SPQR_QX, internals->factorization, y,
+                                                                     internals->context);
+    cholmod_l_free_dense(&y, internals->context);
+
+  } else {
+
+    // compute y = Q^T b
+    cholmod_dense* y = SuiteSparseQR_qmult<typename SOLVER_ENTRYTYPE<T>::type>(SPQR_QTX, internals->factorization,
+                                                                               inMat, internals->context);
+
+    // solve x = R^-1 y
+    // TODO what is this E doing here?
+    outMat = SuiteSparseQR_solve<typename SOLVER_ENTRYTYPE<T>::type>(SPQR_RETX_EQUALS_B, internals->factorization, y,
+                                                                     internals->context);
+
+    cholmod_l_free_dense(&y, internals->context);
+  }
+
+  // Convert back
+  toEigenMatrix(outMat, internals->context, x);
+
+  // Free
+  cholmod_l_free_dense(&outMat, internals->context);
+  cholmod_l_free_dense(&inMat, internals->context);
+
+// Eigen version
+#else
+  // Solve
+  x = internals->solver.solve(rhs);
+  if (internals->solver.info() != Eigen::Success) {
+    std::cerr << "Solver error: " << internals->solver.info() << std::endl;
+    // std::cerr << "Solver says: " << solver.lastErrorMessage() << std::endl;
+    throw std::invalid_argument("Solve failed");
+  }
+#endif
+}
 
 template <typename T>
 size_t Solver<T>::rank() {

@@ -68,6 +68,11 @@ public:
   // Solve for a particular right hand side, and return in an existing vector objects
   virtual void solve(Vector<T>& x, const Vector<T>& rhs) = 0;
 
+
+  // Solve M * x = rhs where rhs is some matrix
+  virtual void solveMatrix(DenseMatrix<T>& x, const DenseMatrix<T>& rhs) = 0;
+  virtual DenseMatrix<T> solveMatrix(const DenseMatrix<T>& rhs) = 0;
+
 protected:
   size_t nRows, nCols;
 };
@@ -87,6 +92,10 @@ public:
   // Solve!
   void solve(Vector<T>& x, const Vector<T>& rhs) override;
   Vector<T> solve(const Vector<T>& rhs) override;
+
+  // Solve matrix system
+  void solveMatrix(DenseMatrix<T>& x, const DenseMatrix<T>& rhs) override;
+  DenseMatrix<T> solveMatrix(const DenseMatrix<T>& rhs) override;
 
   // Gets the rank of the system
   size_t rank();
@@ -109,6 +118,10 @@ public:
   void solve(Vector<T>& x, const Vector<T>& rhs) override;
   Vector<T> solve(const Vector<T>& rhs) override;
 
+  // Solve matrix system
+  void solveMatrix(DenseMatrix<T>& x, const DenseMatrix<T>& rhs) override;
+  DenseMatrix<T> solveMatrix(const DenseMatrix<T>& rhs) override;
+
 protected:
   std::unique_ptr<PSDSolverInternals<T>> internals;
 };
@@ -125,6 +138,10 @@ public:
   // Solve!
   void solve(Vector<T>& x, const Vector<T>& rhs) override;
   Vector<T> solve(const Vector<T>& rhs) override;
+
+  // Solve matrix system
+  void solveMatrix(DenseMatrix<T>& x, const DenseMatrix<T>& rhs) override;
+  DenseMatrix<T> solveMatrix(const DenseMatrix<T>& rhs) override;
 
 protected:
   // Implementation-specific quantities

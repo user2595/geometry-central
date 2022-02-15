@@ -188,6 +188,76 @@ cholmod_dense* toCholmod(const Eigen::Matrix<std::complex<double>, Eigen::Dynami
 
   return cVec;
 }
+
+// Double-valued dense matrix
+template <>
+cholmod_dense* toCholmod(const DenseMatrix<double>& mat, CholmodContext& context) {
+  size_t Nrows = mat.rows();
+  size_t Ncols = mat.cols();
+
+  cholmod_dense* cMat = cholmod_l_allocate_dense(Nrows, Ncols, Nrows, CHOLMOD_REAL, context);
+  double* cMatD = (double*)cMat->x;
+  size_t d = cMat->d;
+  for (size_t i = 0; i < Nrows; i++) {
+    for (size_t j = 0; j < Ncols; j++) {
+      cMatD[i + j * d] = mat(i, j);
+    }
+  }
+
+  return cMat;
+}
+
+// Float-valued dense matrix
+template <>
+cholmod_dense* toCholmod(const DenseMatrix<float>& mat, CholmodContext& context) {
+  size_t Nrows = mat.rows();
+  size_t Ncols = mat.cols();
+
+  cholmod_dense* cMat = cholmod_l_allocate_dense(Nrows, Ncols, Nrows, CHOLMOD_REAL, context);
+  double* cMatD = (double*)cMat->x;
+  size_t d = cMat->d;
+  for (size_t i = 0; i < Nrows; i++) {
+    for (size_t j = 0; j < Ncols; j++) {
+      cMatD[i + j * d] = mat(i, j);
+    }
+  }
+
+  return cMat;
+}
+
+// complex-valued dense matrix
+template <>
+cholmod_dense* toCholmod(const DenseMatrix<std::complex<double>>& mat, CholmodContext& context) {
+  size_t Nrows = mat.rows();
+  size_t Ncols = mat.cols();
+
+  cholmod_dense* cMat = cholmod_l_allocate_dense(Nrows, Ncols, Nrows, CHOLMOD_COMPLEX, context);
+  std::complex<double>* cMatD = (std::complex<double>*)cMat->x;
+  size_t d = cMat->d;
+  for (size_t j = 0; j < Ncols; j++) {
+    for (size_t i = 0; i < Nrows; i++) {
+      cMatD[i + j * d] = mat(i, j);
+    }
+  }
+
+  return cMat;
+}
+
+// Allocate a dense matrix
+template <>
+cholmod_dense* allocateCholmod<double>(size_t Nrows, size_t Ncols, CholmodContext& context) {
+  return cholmod_l_allocate_dense(Nrows, Ncols, Nrows, CHOLMOD_REAL, context);
+}
+template <>
+cholmod_dense* allocateCholmod<float>(size_t Nrows, size_t Ncols, CholmodContext& context) {
+  return cholmod_l_allocate_dense(Nrows, Ncols, Nrows, CHOLMOD_REAL, context);
+}
+template <>
+cholmod_dense* allocateCholmod<std::complex<double>>(size_t Nrows, size_t Ncols, CholmodContext& context) {
+  return cholmod_l_allocate_dense(Nrows, Ncols, Nrows, CHOLMOD_COMPLEX, context);
+}
+
+
 // Convert a vector
 template <typename T>
 void toEigen(cholmod_dense* cVec, CholmodContext& context, Eigen::Matrix<T, Eigen::Dynamic, 1>& xOut) {
@@ -213,6 +283,32 @@ template void toEigen(cholmod_dense* cVec, CholmodContext& context, Eigen::Matri
 template void toEigen(cholmod_dense* cVec, CholmodContext& context, Eigen::Matrix<float, Eigen::Dynamic, 1>& xOut);
 template void toEigen(cholmod_dense* cVec, CholmodContext& context,
                       Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 1>& xOut);
+
+// Convert a vector
+template <typename T>
+void toEigenMatrix(cholmod_dense* cMat, CholmodContext& context, DenseMatrix<T>& matOut) {
+
+  size_t Nrows = cMat->nrow;
+  size_t Ncols = cMat->ncol;
+
+  // Ensure output is large enough
+  matOut = DenseMatrix<T>(Nrows, Ncols);
+
+  // Type wizardry. This type is 'double' if T == 'float', and T otherwise
+  // Needed because cholmod always uses double precision
+  typedef typename std::conditional<std::is_same<T, float>::value, double, T>::type SCALAR_TYPE;
+
+  SCALAR_TYPE* cMatS = (SCALAR_TYPE*)cMat->x;
+  size_t d = cMat->d;
+  for (size_t j = 0; j < Ncols; j++) {
+    for (size_t i = 0; i < Nrows; i++) {
+      matOut(i, j) = cMatS[i + j * d];
+    }
+  }
+}
+template void toEigenMatrix(cholmod_dense* cMat, CholmodContext& context, DenseMatrix<double>& xOut);
+template void toEigenMatrix(cholmod_dense* cMat, CholmodContext& context, DenseMatrix<float>& xOut);
+template void toEigenMatrix(cholmod_dense* cMat, CholmodContext& context, DenseMatrix<std::complex<double>>& xOut);
 
 } // namespace geometrycentral
 #endif

@@ -43,8 +43,8 @@ public:
 };
 
 
-  // Type helper. This type is 'double' if T == 'float', and T otherwise
-template<typename T>
+// Type helper. This type is 'double' if T == 'float', and T otherwise
+template <typename T>
 struct SOLVER_ENTRYTYPE {
   typedef typename std::conditional<std::is_same<T, float>::value, double, T>::type type;
 };
@@ -61,8 +61,20 @@ cholmod_sparse* toCholmod(Eigen::SparseMatrix<T, Eigen::ColMajor>& A, CholmodCon
 template <typename T>
 cholmod_dense* toCholmod(const Eigen::Matrix<T, Eigen::Dynamic, 1>& v, CholmodContext& context);
 
+// Convert a dense matrix
+template <typename T>
+cholmod_dense* toCholmod(const DenseMatrix<T>& mat, CholmodContext& context);
+
+// Allocate a dense matrix
+template <typename T>
+cholmod_dense* allocateCholmod(size_t Nrows, size_t Ncols, CholmodContext& context);
+
 // Convert a vector
 template <typename T>
 void toEigen(cholmod_dense* cVec, CholmodContext& context, Eigen::Matrix<T, Eigen::Dynamic, 1>& xOut);
+
+// Convert a vector
+template <typename T>
+void toEigenMatrix(cholmod_dense* cMat, CholmodContext& context, DenseMatrix<T>& matOut);
 
 } // namespace geometrycentral
