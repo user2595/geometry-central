@@ -46,6 +46,9 @@ public:
   // (returns WITHOUT performing constant shift to 0)
   Vector<double> computeDistanceRHS(const Vector<double>& rhs);
 
+  // Solve for distance from a curve
+  VertexData<double> computeDistanceCurve(const std::vector<SurfacePoint>& sourcePoints);
+
   // === Options and parameters
 
   const double tCoef; // the time parameter used for heat flow, measured as time = tCoef * mean_edge_length^2

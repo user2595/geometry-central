@@ -218,6 +218,152 @@ Vector<double> HeatMethodDistanceSolver::computeDistanceRHS(const Vector<double>
   return distVec;
 }
 
+VertexData<double> HeatMethodDistanceSolver::computeDistanceCurve(const std::vector<SurfacePoint>& sourcePoints) {
+  getGeom().requireHalfedgeCotanWeights();
+  getGeom().requireHalfedgeVectorsInFace();
+  getGeom().requireEdgeLengths();
+  getGeom().requireVertexIndices();
+  getGeom().requireVertexDualAreas();
+  getGeom().requireCotanLaplacian();
+  geom.requireEdgeLengths();
+  geom.requireVertexIndices();
+
+  // Helper to measure distance between two points, given their barycentric coordinates
+  auto baryDist = [&](Vector3 b1, Vector3 b2, const std::array<double, 3>& edgeLengths) {
+    // Shindler & Chen 2012, Barycentric Coordinates in Olympiad Geometry, Section 3.2
+    Vector3 bVec = b2 - b1;
+    double d2 = 0;
+    for (int i = 0; i < 3; i++) {
+      d2 += edgeLengths[i] * edgeLengths[i] * bVec[i] * bVec[(i + 1) % 3];
+    }
+    if (!(d2 <= 0)) d2 = 0.; // ensure it's negative so the sqrt below succeed
+    return std::sqrt(-d2);
+  };
+
+  // Distance from point p to the line b1-b2
+  auto distanceToLine = [&](Vector3 p, Vector3 b1, Vector3 b2, const std::array<double, 3>& edgeLengths) {
+    Vector3 bVec = b2 - b1;
+    double lhs = 0;
+    double rhs = 0;
+    for (size_t i = 0; i < 3; i++) {
+      size_t ip = (i + 1) % 3;
+      lhs += 2 * edgeLengths[i] * edgeLengths[i] * bVec[i] * bVec[ip];
+      rhs -=
+          edgeLengths[i] * edgeLengths[i] * (bVec[ip] * b1[i] + bVec[i] * b1[ip] - p[i] * bVec[ip] - p[ip] * bVec[i]);
+    }
+    double t = rhs / lhs;
+    t = fmin(fmax(t, 0), 1); // Clamp t to [0,1]
+    Vector3 bOpt = (1 - t) * b1 + t * b2;
+    return baryDist(p, bOpt, edgeLengths);
+  };
+
+  // === Build RHS
+  VertexData<double> rhs(mesh, 0.);
+  for (size_t iP = 0; iP + 1 < sourcePoints.size(); iP++) {
+    SurfacePoint prev = sourcePoints[iP];
+    SurfacePoint next = sourcePoints[iP + 1];
+
+    Face f = sharedFace(prev, next);
+    Halfedge he = f.halfedge();
+    std::array<double, 3> edgeLengths{geom.edgeLengths[he.edge()], geom.edgeLengths[he.next().edge()],
+                                      geom.edgeLengths[he.next().next().edge()]};
+
+    Vector3 prevBary = prev.inFace(f).faceCoords;
+    Vector3 nextBary = next.inFace(f).faceCoords;
+    double len = baryDist(prevBary, nextBary, edgeLengths);
+
+    Vector3 integral = (prevBary + nextBary) / 2 * len;
+
+    // Set initial values at the three adjacent vertices
+    rhs[he.vertex()] += integral[0];
+    rhs[he.next().vertex()] += integral[1];
+    rhs[he.next().next().vertex()] += integral[2];
+  }
+  Vector<double> rhsVec = rhs.toVector();
+
+  // === Compute Dirichlet boundary conditions
+  // TODO: use same pass as rhs
+  VertexData<double> dirichlet(mesh, 1e10);
+  VertexData<bool> isFree(mesh, true);
+  for (size_t iP = 0; iP + 1 < sourcePoints.size(); iP++) {
+    SurfacePoint prev = sourcePoints[iP];
+    SurfacePoint next = sourcePoints[iP + 1];
+
+    Face f = sharedFace(prev, next);
+    Halfedge he = f.halfedge();
+    std::array<double, 3> edgeLengths{geom.edgeLengths[he.edge()], geom.edgeLengths[he.next().edge()],
+                                      geom.edgeLengths[he.next().next().edge()]};
+
+    Vector3 prevBary = prev.inFace(f).faceCoords;
+    Vector3 nextBary = next.inFace(f).faceCoords;
+
+    std::array<Vertex, 3> fVerts{he.vertex(), he.next().vertex(), he.next().next().vertex()};
+
+    for (size_t iV = 0; iV < 3; iV++) {
+      Vector3 bV = Vector3::zero();
+      bV[iV] = 1;
+      double dist = distanceToLine(bV, prevBary, nextBary, edgeLengths);
+
+      Vertex v = fVerts[iV];
+      dirichlet[v] = fmin(dirichlet[v], dist);
+      isFree[v] = false;
+    }
+  }
+
+  // Vector<double> distVec = computeDistanceRHS(rhsVec);
+
+  // === Solve heat
+  Vector<double> heatVec = heatSolver->solve(rhsVec);
+
+  // === Normalize in each face and evaluate divergence
+  Vector<double> divergenceVec = Vector<double>::Zero(mesh.nVertices());
+  for (Face f : getMesh().faces()) {
+
+    Vector2 gradUDir = Vector2::zero(); // warning, wrong magnitude because we don't care
+    for (Halfedge he : f.adjacentHalfedges()) {
+      Vector2 ePerp = getGeom().halfedgeVectorsInFace[he.next()].rotate90();
+      gradUDir += ePerp * heatVec(getGeom().vertexIndices[he.vertex()]);
+    }
+
+    gradUDir = gradUDir.normalizeCutoff();
+
+    for (Halfedge he : f.adjacentHalfedges()) {
+      double val = getGeom().halfedgeCotanWeights[he] * dot(getGeom().halfedgeVectorsInFace[he], gradUDir);
+      divergenceVec[getGeom().vertexIndices[he.tailVertex()]] += val;
+      divergenceVec[getGeom().vertexIndices[he.tipVertex()]] += -val;
+    }
+  }
+
+  // === Integrate divergence to get distance
+  // TODO: factoring this every time could get expensive
+
+  SparseMatrix<double>& L = getGeom().cotanLaplacian;
+
+  SparseMatrix<double> Ls = L + 1e-6 * identityMatrix<double>(mesh.nVertices());
+  BlockDecompositionResult<double> decomp = blockDecomposeSquare(Ls, isFree.raw(), false);
+
+  Vector<double> div_i, div_b, dirichlet_i, dirichlet_b;
+  decomposeVector(decomp, divergenceVec, div_i, div_b);
+  decomposeVector(decomp, dirichlet.raw(), dirichlet_i, dirichlet_b);
+
+  Vector<double> schur_rhs = div_i - decomp.AB * dirichlet_b;
+
+  Vector<double> dist_i = solvePositiveDefinite(decomp.AA, schur_rhs);
+  Vector<double> distVec = reassembleVector(decomp, dist_i, dirichlet_b);
+
+  // === No shifting required since we enforce proper distances in solve above
+
+  getGeom().unrequireHalfedgeCotanWeights();
+  getGeom().unrequireHalfedgeVectorsInFace();
+  getGeom().unrequireEdgeLengths();
+  getGeom().unrequireVertexIndices();
+  getGeom().unrequireVertexDualAreas();
+  getGeom().unrequireCotanLaplacian();
+  geom.unrequireEdgeLengths();
+  geom.unrequireVertexIndices();
+
+  return VertexData<double>(mesh, distVec);
+}
 
 } // namespace surface
 } // namespace geometrycentral
