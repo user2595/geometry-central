@@ -55,7 +55,7 @@ public:
 
   IntervalList getEdgeIntervals(Edge e) const;
 
-protected:
+  // protected:
   typedef std::set<interval_pointer, Interval> IntervalQueue;
 
   void update_list_and_queue(list_pointer list,
