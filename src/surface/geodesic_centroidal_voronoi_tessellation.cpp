@@ -104,7 +104,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellation(ManifoldSurfaceMesh& 
 
           energy += dist * dist * weight;
         }
-        updateSum /= updateWSum;
+
         Vector2 update = updateSum / updateWSum;
 
         // Take a step
