@@ -262,6 +262,11 @@ ManifoldSurfaceMesh::ManifoldSurfaceMesh(const std::vector<std::vector<size_t>>&
 ManifoldSurfaceMesh::ManifoldSurfaceMesh(const std::vector<std::vector<size_t>>& polygons,
                                          const std::vector<std::vector<std::tuple<size_t, size_t>>>& twins)
     : SurfaceMesh(true) {
+  constructFromFaceSides(polygons, twins);
+}
+
+void ManifoldSurfaceMesh::constructFromFaceSides(const std::vector<std::vector<size_t>>& polygons,
+                                                 const std::vector<std::vector<std::tuple<size_t, size_t>>>& twins) {
 
   // Assumes that the input index set is dense. This sometimes isn't true of (eg) obj files floating around the
   // internet, so consider removing unused vertices first when reading from foreign sources.
@@ -439,6 +444,45 @@ ManifoldSurfaceMesh::ManifoldSurfaceMesh(const std::vector<std::vector<size_t>>&
   // Print some nice statistics
   // printStatistics();
   // std::cout << "Construction took " << pretty_time(FINISH_TIMING(construction)) << std::endl;
+}
+
+ManifoldSurfaceMesh::ManifoldSurfaceMesh(const std::vector<size_t>& next, const std::vector<size_t>& twin)
+    : SurfaceMesh(true) {
+
+#ifndef NGC_SAFETY_CHECKS
+  validateHalfedgePermutations(next, twin);
+#endif
+
+  std::vector<size_t> heVertex, heFace;
+  size_t nF = indexHalfedgeMeshElements(next, twin, heVertex, heFace).second;
+
+  std::vector<std::vector<size_t>> polygons;
+  std::vector<size_t> halfedgeIndexInFace;
+  std::vector<std::vector<std::tuple<size_t, size_t>>> twinFaceSide;
+
+  convertHalfedgePermutationsToFaceSideMaps(next, twin, heVertex, heFace, nF, polygons, halfedgeIndexInFace,
+                                            twinFaceSide);
+
+  constructFromFaceSides(polygons, twinFaceSide);
+}
+
+
+ManifoldSurfaceMesh::ManifoldSurfaceMesh(const std::vector<size_t>& next) : SurfaceMesh(true) {
+
+#ifndef NGC_SAFETY_CHECKS
+  validateHalfedgePermutations(next);
+#endif
+
+  std::vector<size_t> heVertex, heFace;
+  size_t nF = indexHalfedgeMeshElements(next, heVertex, heFace).second;
+
+  std::vector<std::vector<size_t>> polygons;
+  std::vector<size_t> halfedgeIndexInFace;
+  std::vector<std::vector<std::tuple<size_t, size_t>>> twinFaceSide;
+
+  convertHalfedgePermutationsToFaceSideMaps(next, heVertex, heFace, nF, polygons, halfedgeIndexInFace, twinFaceSide);
+
+  constructFromFaceSides(polygons, twinFaceSide);
 }
 
 ManifoldSurfaceMesh::ManifoldSurfaceMesh(const std::vector<size_t>& heNextArr_, const std::vector<size_t>& heVertexArr_,
@@ -1786,6 +1830,253 @@ std::unique_ptr<ManifoldSurfaceMesh> ManifoldSurfaceMesh::copy() const {
 std::unique_ptr<SurfaceMesh> ManifoldSurfaceMesh::copyToSurfaceMesh() const {
   std::unique_ptr<ManifoldSurfaceMesh> cMesh = copy();
   return std::unique_ptr<SurfaceMesh>(cMesh.release());
+}
+
+//==== Helper functions for constructing a mesh from halfedge maps
+
+std::pair<size_t, size_t> indexHalfedgeMeshElements(const std::vector<size_t>& next, const std::vector<size_t>& twin,
+                                                    std::vector<size_t>& heVertex, std::vector<size_t>& heFace) {
+  size_t nH = next.size();
+
+  // find the previous halfedge along the boundary for each boundary halfedge.
+  // On a mesh with filled-in boundary loops, this corresponds to
+  // halfedge.twin().next().twin()
+  std::vector<size_t> prevAlongBoundary(nH, INVALID_IND);
+  for (size_t iH = 0; iH < nH; iH++) {
+    if (twin[iH] == INVALID_IND) {
+
+      // loop clockwise around vertex until hitting the other boundary
+      // halfedge
+      size_t currHe = next[iH];
+      while (twin[currHe] != INVALID_IND) currHe = next[twin[currHe]];
+
+      prevAlongBoundary[currHe] = iH;
+    }
+  }
+
+  heVertex = std::vector<size_t>(nH, INVALID_IND);
+  heFace = std::vector<size_t>(nH, INVALID_IND);
+
+  auto isValid = [&](size_t iHe) -> bool { return iHe != INVALID_IND && iHe < nH; };
+
+  // Loop over halfedges reachable by applying next to iHe and assign them
+  // face index iF
+  auto labelHeFace = [&](size_t iHe, size_t iF) {
+    size_t currHe = iHe;
+    do {
+      heFace[currHe] = iF;
+      currHe = next[currHe];
+    } while (currHe != iHe && isValid(currHe));
+  };
+
+  auto labelHeVertex = [&](size_t iHe, size_t iV) {
+    size_t currHe = iHe;
+    do {
+      heVertex[currHe] = iV;
+
+      // Iterate clockwise around vertex. At interior halfedges, use
+      // twin.next as usual. At boundary halfedges, use the
+      // prevAlongBoundary array that we constructed earlier
+      if (twin[currHe] == INVALID_IND) {
+        currHe = next[prevAlongBoundary[currHe]];
+      } else {
+        currHe = next[twin[currHe]];
+      }
+    } while (currHe != iHe && isValid(currHe));
+  };
+
+  size_t iV = 0;
+  size_t iF = 0;
+  for (size_t iHe = 0; iHe < nH; iHe++) {
+    if (heFace[iHe] == INVALID_IND) {
+      labelHeFace(iHe, iF);
+      iF++;
+    }
+
+    if (heVertex[iHe] == INVALID_IND) {
+      labelHeVertex(iHe, iV);
+      iV++;
+    }
+  }
+
+  return std::make_pair(iV, iF);
+}
+std::pair<size_t, size_t> indexHalfedgeMeshElements(const std::vector<size_t>& next, std::vector<size_t>& heVertex,
+                                                    std::vector<size_t>& heFace) {
+  size_t nH = next.size();
+
+  heVertex = std::vector<size_t>(nH, INVALID_IND);
+  heFace = std::vector<size_t>(nH, INVALID_IND);
+
+  auto isValid = [&](size_t iHe) -> bool { return iHe != INVALID_IND && iHe < nH; };
+  auto twin = [](size_t iHe) { return iHe ^ 1; }; // borrowed from surface_mesh.ipp
+
+  // Loop over halfedges reachable by applying next to iHe and assign them
+  // face index iF
+  auto labelHeFace = [&](size_t iHe, size_t iF) {
+    size_t currHe = iHe;
+    do {
+      heFace[currHe] = iF;
+      currHe = next[currHe];
+    } while (currHe != iHe && isValid(currHe));
+  };
+
+  auto labelHeVertex = [&](size_t iHe, size_t iV) {
+    size_t currHe = iHe;
+    do {
+      heVertex[currHe] = iV;
+
+      currHe = next[twin(currHe)];
+    } while (currHe != iHe && isValid(currHe));
+  };
+
+  size_t iV = 0;
+  size_t iF = 0;
+  for (size_t iHe = 0; iHe < nH; iHe++) {
+    if (heFace[iHe] == INVALID_IND) {
+      labelHeFace(iHe, iF);
+      iF++;
+    }
+
+    if (heVertex[iHe] == INVALID_IND) {
+      labelHeVertex(iHe, iV);
+      iV++;
+    }
+  }
+
+  return std::make_pair(iV, iF);
+}
+
+void convertHalfedgePermutationsToFaceSideMaps(const std::vector<size_t>& next, const std::vector<size_t>& twin,
+                                               const std::vector<size_t>& heVertex, const std::vector<size_t>& heFace,
+                                               size_t nFaces, std::vector<std::vector<size_t>>& polygons,
+                                               std::vector<size_t>& halfedgeIndexInFace,
+                                               std::vector<std::vector<std::tuple<size_t, size_t>>>& twinFaceSide) {
+
+  size_t nH = next.size();
+
+  polygons = std::vector<std::vector<size_t>>(nFaces, {});
+  halfedgeIndexInFace = std::vector<size_t>(nH);
+  twinFaceSide = std::vector<std::vector<std::tuple<size_t, size_t>>>(nFaces, {});
+
+  // build face vertex list and local halfedge indices
+  // initialize face-side twin map, but don't fill until next loop when we
+  // know all local indices
+  for (size_t iH = 0; iH < nH; iH++) {
+    size_t iF = heFace[iH];
+
+    // If we've already built the face's arrays, continue
+    if (!polygons[iF].empty()) continue;
+
+    size_t currHe = iH;
+    size_t iSide = 0;
+    do {
+      polygons[iF].push_back(heVertex[currHe]);
+      halfedgeIndexInFace[currHe] = iSide;
+      currHe = next[currHe];
+      iSide++;
+    } while (currHe != iH);
+
+    twinFaceSide[iF] = std::vector<std::tuple<size_t, size_t>>(iSide);
+  }
+
+  // build twin map in terms of face-sides
+  for (size_t iH = 0; iH < nH; iH++) {
+    size_t iF = heFace[iH];
+    size_t iSide = halfedgeIndexInFace[iH];
+
+    if (twin[iH] == INVALID_IND) {
+      twinFaceSide[iF][iSide] = std::make_tuple(INVALID_IND, INVALID_IND);
+    } else {
+      size_t iFTwin = heFace[twin[iH]];
+      size_t iSideTwin = halfedgeIndexInFace[twin[iH]];
+      twinFaceSide[iF][iSide] = std::make_tuple(iFTwin, iSideTwin);
+    }
+  }
+}
+
+void convertHalfedgePermutationsToFaceSideMaps(const std::vector<size_t>& next, const std::vector<size_t>& heVertex,
+                                               const std::vector<size_t>& heFace, size_t nFaces,
+                                               std::vector<std::vector<size_t>>& polygons,
+                                               std::vector<size_t>& halfedgeIndexInFace,
+                                               std::vector<std::vector<std::tuple<size_t, size_t>>>& twinFaceSide) {
+
+  auto twin = [](size_t iHe) { return iHe ^ 1; }; // borrowed from surface_mesh.ipp
+
+  size_t nH = next.size();
+
+  polygons = std::vector<std::vector<size_t>>(nFaces, {});
+  halfedgeIndexInFace = std::vector<size_t>(nH);
+  twinFaceSide = std::vector<std::vector<std::tuple<size_t, size_t>>>(nFaces, {});
+
+  // build face vertex list and local halfedge indices
+  // initialize face-side twin map, but don't fill until next loop when we
+  // know all local indices
+  for (size_t iH = 0; iH < nH; iH++) {
+    size_t iF = heFace[iH];
+
+    // If we've already built the face's arrays, continue
+    if (!polygons[iF].empty()) continue;
+
+    size_t currHe = iH;
+    size_t iSide = 0;
+    do {
+      polygons[iF].push_back(heVertex[currHe]);
+      halfedgeIndexInFace[currHe] = iSide;
+      currHe = next[currHe];
+      iSide++;
+    } while (currHe != iH);
+
+    twinFaceSide[iF] = std::vector<std::tuple<size_t, size_t>>(iSide);
+  }
+
+  // build twin map in terms of face-sides
+  for (size_t iH = 0; iH < nH; iH++) {
+    size_t iF = heFace[iH];
+    size_t iSide = halfedgeIndexInFace[iH];
+
+    size_t iFTwin = heFace[twin(iH)];
+    size_t iSideTwin = halfedgeIndexInFace[twin(iH)];
+    twinFaceSide[iF][iSide] = std::make_tuple(iFTwin, iSideTwin);
+  }
+}
+
+void validateHalfedgePermutations(const std::vector<size_t>& next, const std::vector<size_t>& twin) {
+  size_t nH = next.size();
+  GC_SAFETY_ASSERT(twin.size() == nH, "next array has " + std::to_string(next.size()) +
+                                          " elements, but twin array has " + std::to_string(twin.size()) + " elements");
+
+  std::vector<size_t> prev(nH, INVALID_IND);
+  for (size_t iH = 0; iH < nH; iH++) {
+    // Check that twin.twin = identity, except for boundary halfedges
+    if (twin[iH] != INVALID_IND) {
+      GC_SAFETY_ASSERT(twin[twin[iH]] == iH, "twin(twin(" + std::to_string(iH) + ")) != " + std::to_string(iH));
+    }
+
+    // Check that next has no cycles of length < 3
+    GC_SAFETY_ASSERT(next[iH] != iH, "next(" + std::to_string(iH) + ") = " + std::to_string(iH));
+    GC_SAFETY_ASSERT(next[next[iH]] != iH, "next(next(" + std::to_string(iH) + ")) = " + std::to_string(iH));
+
+    // Check that next is injective
+    GC_SAFETY_ASSERT(prev[next[iH]] == INVALID_IND, "next(" + std::to_string(prev[next[iH]]) + ") = next(" +
+                                                        std::to_string(iH) + ") = " + std::to_string(next[iH]));
+    prev[next[iH]] = iH;
+  }
+}
+
+void validateHalfedgePermutations(const std::vector<size_t>& next) {
+  size_t nH = next.size();
+  std::vector<size_t> prev(nH, INVALID_IND);
+  for (size_t iH = 0; iH < nH; iH++) {
+    // Check that next has no cycles of length < 3
+    GC_SAFETY_ASSERT(next[iH] != iH, "next(" + std::to_string(iH) + ") = " + std::to_string(iH));
+    GC_SAFETY_ASSERT(next[next[iH]] != iH, "next(next(" + std::to_string(iH) + ")) = " + std::to_string(iH));
+
+    // Check that next is injective
+    GC_SAFETY_ASSERT(prev[next[iH]] == INVALID_IND, "next(" + std::to_string(prev[next[iH]]) + ") = next(" +
+                                                        std::to_string(iH) + ") = " + std::to_string(next[iH]));
+    prev[next[iH]] = iH;
+  }
 }
 
 } // namespace surface

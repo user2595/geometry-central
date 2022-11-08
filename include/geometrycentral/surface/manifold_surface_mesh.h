@@ -24,6 +24,17 @@ public:
   ManifoldSurfaceMesh(const std::vector<std::vector<size_t>>& polygons,
                       const std::vector<std::vector<std::tuple<size_t, size_t>>>& twins);
 
+  // Make a manifold surface mesh from halfedge next and twin arrays
+  // Set twin[halfedge] = INVALID_IND for boundary halfedges
+  // Assumes manifoldness, errors our if not
+  // WARNING: halfedge indices in the constructed mesh will not be the same as they were in the next and twin maps
+  // To get mapping between original indices and constructed halfedges, use the factory method in
+  // `surface_mesh_factories.h`
+  ManifoldSurfaceMesh(const std::vector<size_t>& next, const std::vector<size_t>& twin);
+
+  // Like above but uses implicit twin convention
+  ManifoldSurfaceMesh(const std::vector<size_t>& next);
+
   virtual ~ManifoldSurfaceMesh();
 
   int eulerCharacteristic() const; // compute the Euler characteristic [O(1)]
@@ -104,6 +115,9 @@ protected:
                       const std::vector<size_t>& heFaceArr, const std::vector<size_t>& vHalfedgeArr,
                       const std::vector<size_t>& fHalfedgeArr, size_t nBoundaryLoopFillCount);
 
+  void constructFromFaceSides(const std::vector<std::vector<size_t>>& polygons,
+                              const std::vector<std::vector<std::tuple<size_t, size_t>>>& twins);
+
   // Helpers
   bool ensureEdgeHasInteriorHalfedge(Edge e);     // impose invariant that e.halfedge is interior
   void ensureVertexHasBoundaryHalfedge(Vertex v); // impose invariant that v.halfedge is start of half-disk
@@ -112,6 +126,31 @@ protected:
 
   friend class RichSurfaceMeshData;
 };
+
+
+//==== Helper functions for constructing a mesh from halfedge maps
+
+// Index the vertices and faces of a halfedge mesh based on next and twin maps
+// Returns the number of vertices and number of faces as a pair
+// Computes the halfedge.vertex() and halfedge.face() maps in the input vectors
+std::pair<size_t, size_t> indexHalfedgeMeshElements(const std::vector<size_t>& next, const std::vector<size_t>& twin,
+                                                    std::vector<size_t>& heVertex, std::vector<size_t>& heFace);
+std::pair<size_t, size_t> indexHalfedgeMeshElements(const std::vector<size_t>& next, std::vector<size_t>& heVertex,
+                                                    std::vector<size_t>& heFace); // uses implicit twin
+void convertHalfedgePermutationsToFaceSideMaps(const std::vector<size_t>& next, const std::vector<size_t>& twin,
+                                               const std::vector<size_t>& heVertex, const std::vector<size_t>& heFace,
+                                               size_t nFaces, std::vector<std::vector<size_t>>& polygons,
+                                               std::vector<size_t>& halfedgeIndexInFace,
+                                               std::vector<std::vector<std::tuple<size_t, size_t>>>& twinFaceSide);
+void convertHalfedgePermutationsToFaceSideMaps(
+    const std::vector<size_t>& next, const std::vector<size_t>& heVertex, const std::vector<size_t>& heFace,
+    size_t nFaces, std::vector<std::vector<size_t>>& polygons, std::vector<size_t>& halfedgeIndexInFace,
+    std::vector<std::vector<std::tuple<size_t, size_t>>>& twinFaceSide); // uses implicit twin
+
+// throws exception if next, twin don't describe a valid halfedge
+// mesh with boundary
+void validateHalfedgePermutations(const std::vector<size_t>& next, const std::vector<size_t>& twin);
+void validateHalfedgePermutations(const std::vector<size_t>& next); // uses implicit twin
 
 } // namespace surface
 } // namespace geometrycentral

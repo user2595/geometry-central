@@ -7,10 +7,10 @@
 #include <tuple>
 
 
-// These methods construct the connectivity and geometry of a mesh simultaneously.
-
 namespace geometrycentral {
 namespace surface {
+
+//=== These methods construct the connectivity and geometry of a mesh simultaneously.
 
 // Assumes manifoldness, errors our if not
 std::tuple<std::unique_ptr<ManifoldSurfaceMesh>, std::unique_ptr<VertexPositionGeometry>>
@@ -62,6 +62,19 @@ makeManifoldSurfaceMeshAndGeometry(const Eigen::MatrixBase<Scalar_V>& vMat, cons
 template <typename Scalar_V, typename Scalar_F>
 std::tuple<std::unique_ptr<SurfaceMesh>, std::unique_ptr<VertexPositionGeometry>>
 makeSurfaceMeshAndGeometry(const Eigen::MatrixBase<Scalar_V>& vMat, const Eigen::MatrixBase<Scalar_F>& fMat);
+
+//==== These methods construct a mesh from halfedge maps
+
+// Make a manifold surface mesh from halfedge next and twin arrays
+// Set twin[halfedge] = INVALID_IND for boundary halfedges
+// Halfedge indices in constructed mesh may differ from indices in input. This method returns the  mapping from old
+// halfedge indices to new halfedges
+std::tuple<std::unique_ptr<ManifoldSurfaceMesh>, std::vector<Halfedge>>
+makeManifoldSurfaceMeshAndHalfedgeIndices(const std::vector<size_t>& next, const std::vector<size_t>& twin);
+
+// Like above, but uses implicit twin convention
+std::tuple<std::unique_ptr<ManifoldSurfaceMesh>, std::vector<Halfedge>>
+makeManifoldSurfaceMeshAndHalfedgeIndices(const std::vector<size_t>& next);
 
 } // namespace surface
 } // namespace geometrycentral

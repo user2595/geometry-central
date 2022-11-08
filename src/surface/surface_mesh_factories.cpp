@@ -110,6 +110,78 @@ makeSurfaceMeshAndGeometry(const std::vector<std::vector<size_t>>& polygons,
   return std::make_tuple(std::move(mesh), std::move(geometry), std::move(parameterization));
 }
 
+//==== These methods construct a mesh from halfedge maps
+
+std::tuple<std::unique_ptr<ManifoldSurfaceMesh>, std::vector<Halfedge>>
+makeManifoldSurfaceMeshAndHalfedgeIndices(const std::vector<size_t>& next, const std::vector<size_t>& twin) {
+
+#ifndef NGC_SAFETY_CHECKS
+  validateHalfedgePermutations(next, twin);
+#endif
+
+  std::vector<size_t> heVertex, heFace;
+  size_t nF = indexHalfedgeMeshElements(next, twin, heVertex, heFace).second;
+
+  std::vector<std::vector<size_t>> polygons;
+  std::vector<size_t> halfedgeIndexInFace;
+  std::vector<std::vector<std::tuple<size_t, size_t>>> twinFaceSide;
+
+  convertHalfedgePermutationsToFaceSideMaps(next, twin, heVertex, heFace, nF, polygons, halfedgeIndexInFace,
+                                            twinFaceSide);
+
+  std::unique_ptr<ManifoldSurfaceMesh> mesh(new ManifoldSurfaceMesh(polygons, twinFaceSide));
+
+  // Assumes that constructor respects input face-sides
+  std::vector<Halfedge> meshHalfedges;
+  meshHalfedges.reserve(next.size());
+  for (size_t iH = 0; iH < next.size(); iH++) {
+    Face f = mesh->face(heFace[iH]);
+    size_t iSide = halfedgeIndexInFace[iH];
+    Halfedge he = f.halfedge();
+    for (size_t iStep = 0; iStep < iSide; iStep++) {
+      he = he.next();
+    }
+    meshHalfedges.push_back(he);
+  }
+
+  return std::make_tuple(std::move(mesh), meshHalfedges);
+}
+
+// Like above, but uses implicit twin convention
+std::tuple<std::unique_ptr<ManifoldSurfaceMesh>, std::vector<Halfedge>>
+makeManifoldSurfaceMeshAndHalfedgeIndices(const std::vector<size_t>& next) {
+
+#ifndef NGC_SAFETY_CHECKS
+  validateHalfedgePermutations(next);
+#endif
+
+  std::vector<size_t> heVertex, heFace;
+  size_t nF = indexHalfedgeMeshElements(next, heVertex, heFace).second;
+
+  std::vector<std::vector<size_t>> polygons;
+  std::vector<size_t> halfedgeIndexInFace;
+  std::vector<std::vector<std::tuple<size_t, size_t>>> twinFaceSide;
+
+  convertHalfedgePermutationsToFaceSideMaps(next, heVertex, heFace, nF, polygons, halfedgeIndexInFace, twinFaceSide);
+
+  std::unique_ptr<ManifoldSurfaceMesh> mesh(new ManifoldSurfaceMesh(polygons, twinFaceSide));
+
+  // Assumes that constructor respects input face-sides
+  std::vector<Halfedge> meshHalfedges;
+  meshHalfedges.reserve(next.size());
+  for (size_t iH = 0; iH < next.size(); iH++) {
+    Face f = mesh->face(heFace[iH]);
+    size_t iSide = halfedgeIndexInFace[iH];
+    Halfedge he = f.halfedge();
+    for (size_t iStep = 0; iStep < iSide; iStep++) {
+      he = he.next();
+    }
+    meshHalfedges.push_back(he);
+  }
+
+  return std::make_tuple(std::move(mesh), meshHalfedges);
+}
+
 
 } // namespace surface
 } // namespace geometrycentral
