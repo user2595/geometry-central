@@ -33,7 +33,7 @@ Vector3 normalizeBarycentricDisplacement(Vector3 baryVec);
 Vector3 projectInsideTriangle(Vector3 baryCoords); // Allows not-normalized input
 
 // Is the point inside the triangle?
-bool isInsideTriangle(Vector3 baryCoords); 
+bool isInsideTriangle(Vector3 baryCoords);
 
 // The index of the halfedge in a triangular face,
 int halfedgeIndexInTriangle(Halfedge he);
