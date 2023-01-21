@@ -435,6 +435,7 @@ void IntrinsicGeometryInterface::computeCotanLaplacian() {
     size_t iVTail = vertexIndices[vTail];
 
     double weight = edgeCotanWeights[e];
+    if (std::isnan(weight) || !std::isfinite(weight)) weight=1;
 
     tripletList.emplace_back(iVTail, iVTail, weight);
     tripletList.emplace_back(iVHead, iVHead, weight);

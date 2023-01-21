@@ -69,6 +69,14 @@ public:
   virtual void afterFaceSplit(const Vertex& v, const std::vector<double>& bSplit) {}
 };
 
+class FaceCutPolicy : public virtual MutationPolicy {
+public:
+  virtual void beforeFaceCut(const Face& f, const Vertex& vA, const Vertex& vB) {}
+
+  // new vertex with barycentric coordinates bCut within face f
+  virtual void afterFaceCut(const Halfedge& hCut) {}
+};
+
 class MutationPolicyHandle {
 public:
   MutationPolicyHandle(MutationManager& manager, MutationPolicy* policy);
@@ -170,6 +178,8 @@ public:
   std::vector<Halfedge> cutAlongPath(const std::vector<SurfacePoint>& pathNodes,
                                      const std::vector<std::array<size_t, 2>>& pathEdges);
 
+  std::vector<Face> triangulate(Face f);
+
   // ======================================================
   // ======== High-level mutations
   // ======================================================
@@ -238,32 +248,35 @@ public:
 
 
   template <typename Fpre, typename Fpost>
-  void registerEdgeFlipHandlers(Fpre pre, Fpost post);
+  MutationPolicyHandle registerEdgeFlipHandlers(Fpre pre, Fpost post);
   template <typename Fpre>
-  void registerEdgeFlipPreHandler(Fpre pre);
+  MutationPolicyHandle registerEdgeFlipPreHandler(Fpre pre);
   template <typename Fpost>
-  void registerEdgeFlipPostHandler(Fpost post);
+  MutationPolicyHandle registerEdgeFlipPostHandler(Fpost post);
 
   template <typename Fpre, typename Fpost>
-  void registerEdgeSplitHandlers(Fpre pre, Fpost post);
+  MutationPolicyHandle registerEdgeSplitHandlers(Fpre pre, Fpost post);
   template <typename Fpre>
-  void registerEdgeSplitPreHandler(Fpre pre);
+  MutationPolicyHandle registerEdgeSplitPreHandler(Fpre pre);
   template <typename Fpost>
-  void registerEdgeSplitPostHandler(Fpost post);
+  MutationPolicyHandle registerEdgeSplitPostHandler(Fpost post);
 
   template <typename Fpre, typename Fpost>
-  void registerFaceSplitHandlers(Fpre pre, Fpost post);
+  MutationPolicyHandle registerFaceSplitHandlers(Fpre pre, Fpost post);
   template <typename Fpre>
-  void registerFaceSplitPreHandler(Fpre pre);
+  MutationPolicyHandle registerFaceSplitPreHandler(Fpre pre);
   template <typename Fpost>
-  void registerFaceSplitPostHandler(Fpost post);
+  MutationPolicyHandle registerFaceSplitPostHandler(Fpost post);
 
   template <typename Fpre, typename Fpost>
-  void registerEdgeCollapseHandlers(Fpre pre, Fpost post);
+  MutationPolicyHandle registerEdgeCollapseHandlers(Fpre pre, Fpost post);
   template <typename Fpre>
-  void registerEdgeCollapsePreHandler(Fpre pre);
+  MutationPolicyHandle registerEdgeCollapsePreHandler(Fpre pre);
   template <typename Fpost>
-  void registerEdgeCollapsePostHandler(Fpost post);
+  MutationPolicyHandle registerEdgeCollapsePostHandler(Fpost post);
+
+  template <typename Fpre, typename Fpost>
+  MutationPolicyHandle registerFaceCutHandlers(Fpre pre, Fpost post);
 
 
   // == Manual interface: add callbacks on to these lists to do whatever you want.
@@ -294,6 +307,7 @@ private:
   std::vector<EdgeSplitPolicy*> edgeSplitPolicies;
   std::vector<EdgeCollapsePolicy*> edgeCollapsePolicies;
   std::vector<FaceSplitPolicy*> faceSplitPolicies;
+  std::vector<FaceCutPolicy*> faceCutPolicies;
 };
 
 } // namespace surface

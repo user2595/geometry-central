@@ -61,6 +61,11 @@ bool MutationManager::flipEdge(Edge e) {
 
 Halfedge MutationManager::insertVertexAlongEdge(Edge e, double tSplit) {
 
+  // Invoke before callbacks
+  for (EdgeSplitPolicy* policy : edgeSplitPolicies) {
+    policy->beforeEdgeSplit(e, tSplit);
+  }
+
   Vector3 newPos = Vector3::zero();
   if (geometry) {
     VertexData<Vector3>& pos = geometry->vertexPositions;
@@ -70,6 +75,12 @@ Halfedge MutationManager::insertVertexAlongEdge(Edge e, double tSplit) {
   if (geometry) {
     geometry->vertexPositions[he.vertex()] = newPos;
   }
+
+  // Invoke after callbacks
+  for (EdgeSplitPolicy* policy : edgeSplitPolicies) {
+    policy->afterEdgeSplit(he, he.twin().next(), tSplit);
+  }
+
   return he;
 }
 
@@ -492,6 +503,32 @@ std::vector<Halfedge> MutationManager::cutAlongPath(const std::vector<SurfacePoi
   return cutHalfedges;
 }
 
+std::vector<Face> MutationManager::triangulate(Face f) {
+  GC_SAFETY_ASSERT(!f.isBoundaryLoop(), "cannot triangulate boundary loop");
+
+  if (f.isTriangle()) {
+    return {f};
+  }
+
+  std::vector<Halfedge> neighHalfedges;
+  for (Halfedge he : f.adjacentHalfedges()) {
+    neighHalfedges.emplace_back(he);
+  }
+
+  std::vector<Face> allFaces;
+  allFaces.emplace_back(f);
+
+  // currently doing a fan triangulation. chould do something better.
+  Halfedge connectHe = f.halfedge();
+  for (size_t i = 2; i + 1 < neighHalfedges.size(); i++) {
+    connectHe = cutFace(connectHe.tailVertex(), neighHalfedges[i].tailVertex());
+    allFaces.emplace_back(connectHe.twin().face());
+  }
+
+  return allFaces;
+}
+
+
 
 // ======================================================
 // ======== High-level mutations
@@ -581,6 +618,7 @@ MutationPolicyHandle MutationManager::registerPolicy(MutationPolicy* policyObjec
   pushIfSubclass(edgeSplitPolicies, policyObject);
   pushIfSubclass(edgeCollapsePolicies, policyObject);
   pushIfSubclass(faceSplitPolicies, policyObject);
+  pushIfSubclass(faceCutPolicies, policyObject);
 
 
   // Return a handle so the user can (optionally) remove it.
@@ -593,6 +631,8 @@ void MutationManager::removePolicy(const MutationPolicyHandle& toRemove) {
   removeFromVector(edgeFlipPolicies, toRemove.policy);
   removeFromVector(edgeSplitPolicies, toRemove.policy);
   removeFromVector(edgeCollapsePolicies, toRemove.policy);
+  removeFromVector(faceSplitPolicies, toRemove.policy);
+  removeFromVector(faceCutPolicies, toRemove.policy);
 
   // deletion happens here
   removeUniquePtrFromVector(allPolicies, toRemove.policy);

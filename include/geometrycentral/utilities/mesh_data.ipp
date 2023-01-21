@@ -237,12 +237,12 @@ inline size_t MeshData<E, T>::size() const {
 }
 
 template <typename E, typename T>
-typename MeshData<E,T>::DATA_T& MeshData<E, T>::raw() {
+typename MeshData<E, T>::DATA_T& MeshData<E, T>::raw() {
   return data;
 }
 
 template <typename E, typename T>
-const typename MeshData<E,T>::DATA_T& MeshData<E, T>::raw() const {
+const typename MeshData<E, T>::DATA_T& MeshData<E, T>::raw() const {
   return data;
 }
 

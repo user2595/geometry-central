@@ -110,6 +110,17 @@ public:
     if (post) post(newV, tCollapse);
   }
 };
+template <typename T>
+class SimpleFaceCutUpdater : public FaceCutPolicy {
+  // General case where the pre function passes data to the post function. Both must be given.
+  T data;
+
+public:
+  std::function<T(Face, Vertex, Vertex)> pre;
+  std::function<void(Halfedge, T)> post;
+  void beforeFaceCut(const Face& f, const Vertex& vA, const Vertex& vB) override { data = pre(f, vA, vB); }
+  void afterFaceCut(const Halfedge& hCut) override { post(hCut, data); }
+};
 
 // TODO add some ASSERT compile-time checks to these, so that in the likely case where a user passes a non-matching
 // template function, we can give a sane diagnostic message.
@@ -117,90 +128,100 @@ public:
 
 // === Edge flip handler one-liners
 template <typename Fpre, typename Fpost>
-void MutationManager::registerEdgeFlipHandlers(Fpre pre, Fpost post) {
+MutationPolicyHandle MutationManager::registerEdgeFlipHandlers(Fpre pre, Fpost post) {
   using T = decltype(pre(Edge()));
   SimpleFlipUpdater<T>* updater = new SimpleFlipUpdater<T>();
   updater->pre = pre;
   updater->post = post;
-  registerPolicy(updater);
+  return registerPolicy(updater);
 }
 template <typename Fpre>
-void MutationManager::registerEdgeFlipPreHandler(Fpre pre) {
+MutationPolicyHandle MutationManager::registerEdgeFlipPreHandler(Fpre pre) {
   SimpleFlipUpdater<void>* updater = new SimpleFlipUpdater<void>();
   updater->pre = pre;
-  registerPolicy(updater);
+  return registerPolicy(updater);
 }
 template <typename Fpost>
-void MutationManager::registerEdgeFlipPostHandler(Fpost post) {
+MutationPolicyHandle MutationManager::registerEdgeFlipPostHandler(Fpost post) {
   SimpleFlipUpdater<void>* updater = new SimpleFlipUpdater<void>();
   updater->post = post;
-  registerPolicy(updater);
+  return registerPolicy(updater);
 }
 
 // === Edge split handler one-liners
 template <typename Fpre, typename Fpost>
-void MutationManager::registerEdgeSplitHandlers(Fpre pre, Fpost post) {
+MutationPolicyHandle MutationManager::registerEdgeSplitHandlers(Fpre pre, Fpost post) {
   using T = decltype(pre(Edge(), 0.5));
   SimpleSplitUpdater<T>* updater = new SimpleSplitUpdater<T>();
   updater->pre = pre;
   updater->post = post;
-  registerPolicy(updater);
+  return registerPolicy(updater);
 }
 template <typename Fpre>
-void MutationManager::registerEdgeSplitPreHandler(Fpre pre) {
+MutationPolicyHandle MutationManager::registerEdgeSplitPreHandler(Fpre pre) {
   SimpleSplitUpdater<void>* updater = new SimpleSplitUpdater<void>();
   updater->pre = pre;
-  registerPolicy(updater);
+  return registerPolicy(updater);
 }
 template <typename Fpost>
-void MutationManager::registerEdgeSplitPostHandler(Fpost post) {
+MutationPolicyHandle MutationManager::registerEdgeSplitPostHandler(Fpost post) {
   SimpleSplitUpdater<void>* updater = new SimpleSplitUpdater<void>();
   updater->post = post;
-  registerPolicy(updater);
+  return registerPolicy(updater);
 }
 
 // === Vertex insertion handler one-liners
 template <typename Fpre, typename Fpost>
-void MutationManager::registerFaceSplitHandlers(Fpre pre, Fpost post) {
+MutationPolicyHandle MutationManager::registerFaceSplitHandlers(Fpre pre, Fpost post) {
   using T = decltype(pre(Face(), std::vector<double>{0, 0, 0}));
   SimpleFaceSplitUpdater<T>* updater = new SimpleFaceSplitUpdater<T>();
   updater->pre = pre;
   updater->post = post;
-  registerPolicy(updater);
+  return registerPolicy(updater);
 }
 template <typename Fpre>
-void MutationManager::registerFaceSplitPreHandler(Fpre pre) {
+MutationPolicyHandle MutationManager::registerFaceSplitPreHandler(Fpre pre) {
   SimpleFaceSplitUpdater<void>* updater = new SimpleFaceSplitUpdater<void>();
   updater->pre = pre;
-  registerPolicy(updater);
+  return registerPolicy(updater);
 }
 template <typename Fpost>
-void MutationManager::registerFaceSplitPostHandler(Fpost post) {
+MutationPolicyHandle MutationManager::registerFaceSplitPostHandler(Fpost post) {
   SimpleFaceSplitUpdater<void>* updater = new SimpleFaceSplitUpdater<void>();
   updater->post = post;
-  registerPolicy(updater);
+  return registerPolicy(updater);
 }
 
 // === Edge collapse handler one-liners
 template <typename Fpre, typename Fpost>
-void MutationManager::registerEdgeCollapseHandlers(Fpre pre, Fpost post) {
+MutationPolicyHandle MutationManager::registerEdgeCollapseHandlers(Fpre pre, Fpost post) {
   using T = decltype(pre(Edge(), 0.5));
   SimpleEdgeCollapseUpdater<T>* updater = new SimpleEdgeCollapseUpdater<T>();
   updater->pre = pre;
   updater->post = post;
-  registerPolicy(updater);
+  return registerPolicy(updater);
 }
 template <typename Fpre>
-void MutationManager::registerEdgeCollapsePreHandler(Fpre pre) {
+MutationPolicyHandle MutationManager::registerEdgeCollapsePreHandler(Fpre pre) {
   SimpleEdgeCollapseUpdater<void>* updater = new SimpleEdgeCollapseUpdater<void>();
   updater->pre = pre;
-  registerPolicy(updater);
+  return registerPolicy(updater);
 }
 template <typename Fpost>
-void MutationManager::registerEdgeCollapsePostHandler(Fpost post) {
+MutationPolicyHandle MutationManager::registerEdgeCollapsePostHandler(Fpost post) {
   SimpleEdgeCollapseUpdater<void>* updater = new SimpleEdgeCollapseUpdater<void>();
   updater->post = post;
-  registerPolicy(updater);
+  return registerPolicy(updater);
+}
+
+// === Face cut handler one-liners
+template <typename Fpre, typename Fpost>
+MutationPolicyHandle MutationManager::registerFaceCutHandlers(Fpre pre, Fpost post) {
+  using T = decltype(pre(Face(), Vertex(), Vertex()));
+  SimpleFaceCutUpdater<T>* updater = new SimpleFaceCutUpdater<T>();
+  updater->pre = pre;
+  updater->post = post;
+  return registerPolicy(updater);
 }
 
 
