@@ -10,15 +10,101 @@ namespace surface {
 // ======================================================
 
 MutationManager::MutationManager(ManifoldSurfaceMesh& mesh_, VertexPositionGeometry& geometry_)
-    : mesh(mesh_), geometry(&geometry_) {}
+    : mesh(mesh_), geometry(&geometry_) {
+  setConstraintCallbacks();
+}
 
-MutationManager::MutationManager(ManifoldSurfaceMesh& mesh_) : mesh(mesh_) {}
+MutationManager::MutationManager(ManifoldSurfaceMesh& mesh_) : mesh(mesh_) { setConstraintCallbacks(); }
+
+// ======================================================
+// ======== Constraints
+// ======================================================
+
+void MutationManager::setConstraintCallbacks() {
+  // == Register a callback to maintain edge constraint data after edge splits
+  auto cacheConstraintsBeforeEdgeSplit = [&](Edge oldE, double tSplit) -> std::array<bool, 3> {
+    bool wasSplittable = maySplitEdge(oldE);
+    bool wasCollapsible = mayCollapseEdge(oldE);
+    bool wasFlippable = mayFlipEdge(oldE);
+    return {wasSplittable, wasCollapsible, wasFlippable};
+  };
+  auto updateConstraintsAfterEdgeSplit = [&](Halfedge newHe1, Halfedge newHe2, double tSplit,
+                                             std::array<bool, 3> oldConstraints) {
+    if (splittableEdges.size() > 0) {
+      splittableEdges[newHe1.edge()] = oldConstraints[0];
+      splittableEdges[newHe2.edge()] = oldConstraints[0];
+    }
+    if (collapsibleEdges.size() > 0) {
+      collapsibleEdges[newHe1.edge()] = oldConstraints[1];
+      collapsibleEdges[newHe2.edge()] = oldConstraints[1];
+    }
+    if (flippableEdges.size() > 0) {
+      flippableEdges[newHe1.edge()] = oldConstraints[2];
+      flippableEdges[newHe2.edge()] = oldConstraints[2];
+    }
+  };
+  registerEdgeSplitHandlers(cacheConstraintsBeforeEdgeSplit, updateConstraintsAfterEdgeSplit);
+}
+
+void MutationManager::setRepositionableVertices(const VertexData<bool>& repositionableVertices_, bool defaultValue) {
+  repositionableVertices = repositionableVertices_;
+  repositionableVertices.setDefault(defaultValue);
+}
+void MutationManager::clearRepositionableVertices() { repositionableVertices = VertexData<bool>(); }
+bool MutationManager::mayRepositionVertex(Vertex v) const {
+  return repositionableVertices.size() == 0 || repositionableVertices[v];
+}
+
+void MutationManager::setSplittableEdges(const EdgeData<bool>& splittableEdges_, bool defaultValue) {
+  splittableEdges = splittableEdges_;
+  splittableEdges.setDefault(defaultValue);
+}
+void MutationManager::clearSplittableEdges() { splittableEdges = EdgeData<bool>(); }
+bool MutationManager::maySplitEdge(Edge e) const { return splittableEdges.size() == 0 || splittableEdges[e]; }
+
+void MutationManager::setCollapsibleEdges(const EdgeData<bool>& collapsibleEdges_, bool defaultValue) {
+  collapsibleEdges = collapsibleEdges_;
+  collapsibleEdges.setDefault(defaultValue);
+}
+void MutationManager::clearCollapsibleEdges() { collapsibleEdges = EdgeData<bool>(); }
+bool MutationManager::mayCollapseEdge(Edge e) const {
+  if (collapsibleEdges.size() > 0 && !collapsibleEdges[e]) return false;
+  if (repositionableVertices.size() > 0) {
+    for (Vertex v : e.adjacentVertices()) {
+      if (!repositionableVertices[v]) return false;
+    }
+  }
+  return collapsibleEdges.size() == 0 || collapsibleEdges[e];
+}
+
+void MutationManager::setFlippableEdges(const EdgeData<bool>& flippableEdges_, bool defaultValue) {
+  flippableEdges = flippableEdges_;
+  flippableEdges.setDefault(defaultValue);
+}
+void MutationManager::clearFlippableEdges() { flippableEdges = EdgeData<bool>(); }
+bool MutationManager::mayFlipEdge(Edge e) const { return flippableEdges.size() == 0 || flippableEdges[e]; }
+
+void MutationManager::setSplittableFaces(const FaceData<bool>& splittableFaces_, bool defaultValue) {
+  splittableFaces = splittableFaces_;
+  splittableFaces.setDefault(defaultValue);
+}
+void MutationManager::clearSplittableFaces() { splittableFaces = FaceData<bool>(); }
+bool MutationManager::maySplitFace(Face f) const { return splittableFaces.size() == 0 || splittableFaces[f]; }
+
+
+void MutationManager::setCuttableFaces(const FaceData<bool>& cuttableFaces_, bool defaultValue) {
+  cuttableFaces = cuttableFaces_;
+  cuttableFaces.setDefault(defaultValue);
+}
+void MutationManager::clearCuttableFaces() { cuttableFaces = FaceData<bool>(); }
+bool MutationManager::mayCutFace(Face f) const { return cuttableFaces.size() == 0 || cuttableFaces[f]; }
 
 // ======================================================
 // ======== Low-level mutations
 // ======================================================
 
-void MutationManager::repositionVertex(Vertex vert, Vector3 offset) {
+bool MutationManager::repositionVertex(Vertex vert, Vector3 offset) {
+  if (!mayRepositionVertex(vert)) return false;
 
   // Invoke callbacks
   for (VertexRepositionPolicy* policy : vertexRepositionPolicies) {
@@ -26,10 +112,13 @@ void MutationManager::repositionVertex(Vertex vert, Vector3 offset) {
   }
 
   geometry->vertexPositions[vert] += offset;
+  return true;
 }
 
 // Flip an edge.
 bool MutationManager::flipEdge(Edge e) {
+  if (!mayFlipEdge(e)) return false;
+
 
   // First do a test flip to see if its possible
   // TODO implement canFlip() to avoid this
@@ -60,6 +149,7 @@ bool MutationManager::flipEdge(Edge e) {
 }
 
 Halfedge MutationManager::insertVertexAlongEdge(Edge e, double tSplit) {
+  if (!maySplitEdge(e)) return Halfedge();
 
   // Invoke before callbacks
   for (EdgeSplitPolicy* policy : edgeSplitPolicies) {
@@ -85,6 +175,7 @@ Halfedge MutationManager::insertVertexAlongEdge(Edge e, double tSplit) {
 }
 
 std::vector<Vertex> MutationManager::insertVerticesAlongEdge(Edge e, const std::vector<double>& tSplits) {
+  if (!maySplitEdge(e)) return {};
 
   size_t nNodes = tSplits.size();
   std::vector<Vertex> newVertices(nNodes);
@@ -134,6 +225,7 @@ std::vector<Vertex> MutationManager::insertVerticesAlongEdge(Edge e, const std::
 }
 
 Halfedge MutationManager::splitEdge(Edge e, double tSplit) {
+  if (!maySplitEdge(e)) return Halfedge();
   Vector3 newPos{0., 0., 0.};
   if (geometry) {
     VertexData<Vector3>& pos = geometry->vertexPositions;
@@ -143,6 +235,7 @@ Halfedge MutationManager::splitEdge(Edge e, double tSplit) {
 }
 
 Halfedge MutationManager::splitEdge(Edge e, Vector3 newVertexPosition) {
+  if (!maySplitEdge(e)) return Halfedge();
 
   double tSplit = -1;
   GC_SAFETY_ASSERT(geometry, "must have geometry to split by position");
@@ -158,6 +251,7 @@ Halfedge MutationManager::splitEdge(Edge e, Vector3 newVertexPosition) {
 }
 
 Halfedge MutationManager::splitEdge(Edge e, double tSplit, Vector3 newVertexPosition) {
+  if (!maySplitEdge(e)) return Halfedge();
 
   // Invoke before callbacks
   for (EdgeSplitPolicy* policy : edgeSplitPolicies) {
@@ -183,6 +277,7 @@ Halfedge MutationManager::splitEdge(Edge e, double tSplit, Vector3 newVertexPosi
 // Collapse an edge.
 // Returns the new vertex if the edge could be collapsed, and Vertex() otherwise
 Vertex MutationManager::collapseEdge(Edge e, double tCollapse) {
+  if (!mayCollapseEdge(e)) return Vertex();
   Vector3 newPos{0., 0., 0.};
   if (geometry) {
     // Find the nearest tCoord
@@ -193,6 +288,7 @@ Vertex MutationManager::collapseEdge(Edge e, double tCollapse) {
 }
 
 Vertex MutationManager::collapseEdge(Edge e, Vector3 newVertexPosition) {
+  if (!mayCollapseEdge(e)) return Vertex();
 
   double tCollapse = -1;
   GC_SAFETY_ASSERT(geometry, "must have geometry to split by position");
@@ -207,6 +303,7 @@ Vertex MutationManager::collapseEdge(Edge e, Vector3 newVertexPosition) {
   return collapseEdge(e, tCollapse, newVertexPosition);
 }
 Vertex MutationManager::collapseEdge(Edge e, double tCollapse, Vector3 newVertexPosition) {
+  if (!mayCollapseEdge(e)) return Vertex();
 
   // Invoke before callbacks
   // TODO need to handle possiblity that collapse fails -- check before calling
@@ -232,6 +329,7 @@ Vertex MutationManager::collapseEdge(Edge e, double tCollapse, Vector3 newVertex
 
 // Split a face (i.e. insert a vertex into the face)
 Vertex MutationManager::splitFace(Face f, const std::vector<double>& bSplit) {
+  if (!maySplitFace(f)) return Vertex();
   Vector3 newPos = Vector3::zero();
   if (geometry) {
     size_t iV = 0;
@@ -246,6 +344,7 @@ Vertex MutationManager::splitFace(Face f, const std::vector<double>& bSplit) {
 }
 
 Vertex MutationManager::splitFace(Face f, Vector3 newVertexPosition) {
+  if (!maySplitFace(f)) return Vertex();
   // TODO
   throw std::runtime_error("Face split based on vertex position not implemented yet");
   return Vertex();
@@ -253,6 +352,7 @@ Vertex MutationManager::splitFace(Face f, Vector3 newVertexPosition) {
 
 
 Vertex MutationManager::splitFace(Face f, const std::vector<double>& bSplit, Vector3 newVertexPosition) {
+  if (!maySplitFace(f)) return Vertex();
   // Invoke before callbacks
   for (FaceSplitPolicy* policy : faceSplitPolicies) {
     policy->beforeFaceSplit(f, bSplit);
@@ -278,6 +378,8 @@ Halfedge MutationManager::cutFace(Vertex vA, Vertex vB) {
   if (commonFace == Face())
     throw std::logic_error("Can only cut mesh if the vertices at the endpoints of the cut share a face.");
 
+  if (!mayCutFace(commonFace)) return Halfedge();
+
   // If segment already lies along an edge, return an existing halfedge.
   for (Halfedge he : vA.outgoingHalfedges()) {
     if (he.tipVertex() == vB) return he;
@@ -297,6 +399,8 @@ Halfedge MutationManager::cutFace(SurfacePoint pA, SurfacePoint pB) {
 
   Face commonFace = sharedFace(pA, pB);
   if (commonFace == Face()) throw std::logic_error("Can only cut mesh if endpoints of cut share a face.");
+  
+  if (!mayCutFace(commonFace)) return Halfedge();
 
   // TODO: seems buggy
   switch (pA.type) {

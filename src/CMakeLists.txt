@@ -33,6 +33,7 @@ SET(SRCS
   surface/geodesic_centroidal_voronoi_tessellation.cpp
   surface/trace_geodesic.cpp
   surface/normal_coordinates.cpp
+  surface/remeshing.cpp
   surface/surface_centers.cpp
   surface/simple_idt.cpp
   surface/intrinsic_triangulation.cpp
