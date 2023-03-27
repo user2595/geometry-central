@@ -1365,8 +1365,12 @@ bool ManifoldSurfaceMesh::removeFaceAlongBoundary(Face f) {
 
     // Update refs
     for (Halfedge he : f.adjacentHalfedges()) {
-      heFaceArr[he.getIndex()] = bLoop.getIndex();
+      // only update halfedges that we're going to keep. Updating halfedges that we want to delete causes problems with
+      // the logic in deleteEdgeBundle
+      if (he.twin().isInterior()) heFaceArr[he.getIndex()] = bLoop.getIndex();
     }
+    // manually decrement interior halfedge count since two interior halfedges turned into boundary halfedges
+    nInteriorHalfedgesCount -= 2;
 
     // Next refs
     heNextArr[heBPrev.getIndex()] = heTNext.getIndex();
@@ -1430,6 +1434,57 @@ bool ManifoldSurfaceMesh::removeFaceAlongBoundary(Face f) {
 
   } else if (bCount == 2) {
     // Remove an "ear" along the boundary
+
+    // only ear triangles currently supported
+    if (!f.isTriangle()) return false;
+
+    //== Gather values
+    // find halfedge on interior edge
+    Halfedge heI;
+    if (heB.next().twin().isInterior()) {
+      heI = heB.next();
+    } else {
+      heI = heB.next().next();
+    }
+    Halfedge heB0 = heI.next();
+    Halfedge heB1 = heB0.next();
+    Vertex vB = heB0.tipVertex();
+    Face bLoop = heB0.twin().face();
+
+    // next exterior halfedge
+    Halfedge heNext = heI.next().twin().next();
+
+    // prev exterior halfedge
+    Halfedge hePrev = heI.twin();
+    while (hePrev.isInterior()) hePrev = hePrev.next().twin();
+
+    //== Update refs
+
+    // (only update halfedges that we're going to keep. Updating halfedges that we want to delete causes problems with
+    // the logic in deleteEdgeBundle)
+    heFaceArr[heI.getIndex()] = bLoop.getIndex();
+    // manually decrement interior halfedge count since an interior halfedge turned into a boundary halfedge
+    nInteriorHalfedgesCount--;
+
+    // Next refs
+    heNextArr[hePrev.getIndex()] = heI.getIndex();
+    heNextArr[heI.getIndex()] = heNext.getIndex();
+
+    // Vertex halfedges
+    vHalfedgeArr[heI.tailVertex().getIndex()] = hePrev.twin().getIndex();
+    vHalfedgeArr[heI.tipVertex().getIndex()] = heI.twin().getIndex();
+    // ensureVertexHasBoundaryHalfedge(heI.tailVertex());
+
+    fHalfedgeArr[bLoop.getIndex()] = heI.getIndex();
+
+    ensureEdgeHasInteriorHalfedge(heI.edge());
+
+    deleteElement(vB);
+    deleteElement(f);
+    deleteEdgeBundle(heB0.edge());
+    deleteEdgeBundle(heB1.edge());
+    modificationTick++;
+    return true;
 
     /*
     // Gather elements
